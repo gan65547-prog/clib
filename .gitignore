@@ -1,0 +1,24 @@
+# Build artifacts
+*.o
+*.a
+*.so
+*.dylib
+
+# Test artifacts
+tests/clib_test
+tests/clib_test.dSYM/
+tests/*.o
+tests/_plugin_test/
+
+# macOS
+.DS_Store
+
+# Symlinks
+/mlfw
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
