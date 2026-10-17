@@ -22,3 +22,7 @@ tests/_plugin_test/
 *.swp
 *.swo
 *~
+/examples/pool
+/examples/ringbuf
+/examples/thread_pool
+/examples/json

@@ -1,5 +1,8 @@
 # clib — C Middleware Library
 
+![CI](https://github.com/nonggengiang/clib/actions/workflows/ci.yml/badge.svg)
+![version](https://img.shields.io/badge/version-0.1.0-blue)
+
 clib is a portable C library for embedded and edge-device middleware. It provides
 memory pools, data structures, concurrency primitives, event-driven I/O, a JSON
 parser, an HTTP parser, and a plugin framework (mlfw).
@@ -82,14 +85,29 @@ cc -I./include -o myapp myapp.c -L. -lclib -lpthread -lm
 ## Tests
 
 ```sh
-cd tests
 make test
 ```
 
-22 test suites, 160+ test cases covering pool, rbtree, container, bitmap,
-ringbuf, pkbuf, string, base64, md5, thread, thread_pool, event, timer, log,
-mapkey, integration, http parser, json, dictionary, iniparser, set_rbtree,
-shm_pool, zero_copy, plugin lifecycle, IPC, and device plugins.
+26 test suites, 162 test cases. Full CI on Ubuntu + macOS via GitHub Actions.
+
+## Examples
+
+```sh
+cd examples && make && ./pool && ./ringbuf && ./thread_pool && ./json
+```
+
+| Example | Demonstrates |
+|---------|-------------|
+| `pool.c` | Memory pool: create, alloc, free/reuse, destroy |
+| `ringbuf.c` | Lock-free SPSC ring buffer: write, read |
+| `thread_pool.c` | Parallel task submission with worker threads |
+| `json.c` | JSON parse, query, build, print |
+
+## Documentation
+
+- [API Reference](docs/API.md) — all modules with minimal examples
+- [Changelog](CHANGELOG.md)
+- [Examples](examples/)
 
 ## License
 

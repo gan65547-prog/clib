@@ -16,7 +16,7 @@ MLFW_DIR = ../mlfw
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
 	SHARED_EXT  = dylib
-	SHARED_FLAG = -dynamiclib -install_name libclib.dylib
+	SHARED_FLAG = -dynamiclib -install_name @rpath/libclib.dylib
 else
 	SHARED_EXT  = so
 	SHARED_FLAG = -shared -Wl,-soname,libclib.so
