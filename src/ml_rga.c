@@ -83,15 +83,17 @@ ml_rga_create(ml_pool_t *pool)
     ml_rga_t *rga;
 
     if (!ml_rga_available()) return NULL;
+    if (!pool) return NULL;
 
-    rga = calloc(1, sizeof(*rga));
+    rga = pool->f_alloc(pool, sizeof(*rga));
     if (!rga) return NULL;
+    memset(rga, 0, sizeof(*rga));
 
     rga->pool = pool;
 
     if (c_RkRgaInit() < 0) {
         set_err(rga, "RGA init failed");
-        free(rga);
+        pool->f_free(pool, rga);
         return NULL;
     }
 
@@ -112,7 +114,7 @@ ml_rga_destroy(ml_rga_t *rga)
 {
     if (!rga) return;
     if (rga->inited) c_RkRgaDeInit();
-    free(rga);
+    if (rga->pool) rga->pool->f_free(rga->pool, rga);
 }
 
 /* ── execute ──────────────────────────────────────────────────────────── */

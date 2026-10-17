@@ -16,11 +16,13 @@
 #include "../src/ml_codec_stub.c"
 #endif
 
+static ml_pool_t g_pool;
+
 /* ── lifecycle ────────────────────────────────────────────────────────── */
 
 static void test_create_destroy(void)
 {
-    ml_codec_t *c = ml_codec_create(NULL, NULL);
+    ml_codec_t *c = ml_codec_create(NULL, &g_pool);
     /* stub returns non-NULL but encodes fail; MPP may fail without
      * /dev/mpp_service on non-Rockchip Linux */
     if (c) {
@@ -38,7 +40,7 @@ static void test_create_with_cfg(void)
     cfg.height = 480;
     cfg.bitrate = 2000000;
 
-    ml_codec_t *c = ml_codec_create(&cfg, NULL);
+    ml_codec_t *c = ml_codec_create(&cfg, &g_pool);
     if (c) {
         ml_codec_destroy(c);
     }
@@ -63,7 +65,7 @@ static void test_null_checks(void)
 
 static void test_error_str(void)
 {
-    ml_codec_t *c = ml_codec_create(NULL, NULL);
+    ml_codec_t *c = ml_codec_create(NULL, &g_pool);
     if (c) {
         const char *err = ml_codec_error(c);
         /* stub should produce an error message */
@@ -89,6 +91,8 @@ static void test_backend_available(void)
 
 void test_codec_suite(void)
 {
+    ml_pool_create(&g_pool, 0);
+
     TEST_SUITE("ml_codec — MPP hardware encoder");
 
     RUN_TEST("create/destroy",          { test_create_destroy(); });
@@ -96,4 +100,6 @@ void test_codec_suite(void)
     RUN_TEST("null checks",             { test_null_checks(); });
     RUN_TEST("error string",            { test_error_str(); });
     RUN_TEST("backend query",           { test_backend_available(); });
+
+    ml_pool_destroy(&g_pool);
 }

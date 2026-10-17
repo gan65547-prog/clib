@@ -4,17 +4,25 @@
  */
 
 #include "ml_temporal_window.h"
+#include "ml_pool.h"
 #include <stdlib.h>
+#include <string.h>
 #include <float.h>
 
 void
-ml_temporal_window_init(ml_temporal_window_t *w, uint32_t capacity)
+ml_temporal_window_init(ml_temporal_window_t *w, uint32_t capacity, ml_pool_t *pool)
 {
-    if (!w || capacity == 0) return;
-    w->buf       = (float *)calloc(capacity, sizeof(float));
-    w->capacity  = capacity;
+    if (!w || !pool) return;
+    w->buf       = NULL;
+    w->capacity  = 0;
     w->count     = 0;
     w->write_pos = 0;
+    w->pool      = pool;
+    if (capacity == 0) return;
+    w->buf = (float *)pool->f_alloc(pool, capacity * sizeof(float));
+    if (!w->buf) return;
+    memset(w->buf, 0, capacity * sizeof(float));
+    w->capacity = capacity;
 }
 
 void
@@ -31,7 +39,7 @@ void
 ml_temporal_window_free(ml_temporal_window_t *w)
 {
     if (!w || !w->buf) return;
-    free(w->buf);
+    w->pool->f_free(w->pool, w->buf);
     w->buf      = NULL;
     w->capacity = 0;
     w->count    = 0;

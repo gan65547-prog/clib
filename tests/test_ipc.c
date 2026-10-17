@@ -19,8 +19,8 @@
 #include "../include/ml_pool.h"
 #include "../include/ml_string.h"
 #include "../include/ml_log.h"
-#include "../include/mlfw/mlfw_module.h"
-#include "../include/mlfw/mlfw_message.h"
+#include "../../mlfw/include/mlfw/mlfw_module.h"
+#include "../../mlfw/include/mlfw/mlfw_message.h"
 
 #include "../../mlfw/plugins/ipc_echo/ml_plugin_ipc_echo.h"
 #include "../../mlfw/plugins/ipc_ping/ml_plugin_ipc_ping.h"

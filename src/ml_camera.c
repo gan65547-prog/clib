@@ -15,7 +15,7 @@
 ml_camera_t *
 ml_camera_create(const ml_camera_cfg_t *cfg, ml_pool_t *pool)
 {
-    if (!cfg) return NULL;
+    if (!cfg || !pool) return NULL;
 
     switch (cfg->backend) {
 #ifdef ML_CAMERA_HAS_V4L2

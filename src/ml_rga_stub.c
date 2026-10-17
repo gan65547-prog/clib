@@ -16,8 +16,10 @@ struct ml_rga_s {
 
 ml_rga_t *ml_rga_create(ml_pool_t *pool)
 {
-    ml_rga_t *rga = calloc(1, sizeof(*rga));
+    if (!pool) return NULL;
+    ml_rga_t *rga = pool->f_alloc(pool, sizeof(*rga));
     if (!rga) return NULL;
+    memset(rga, 0, sizeof(*rga));
     rga->pool = pool;
     snprintf(rga->err_msg, sizeof(rga->err_msg),
              "RGA not available on this platform");
@@ -25,7 +27,9 @@ ml_rga_t *ml_rga_create(ml_pool_t *pool)
     return rga;
 }
 
-void ml_rga_destroy(ml_rga_t *rga) { free(rga); }
+void ml_rga_destroy(ml_rga_t *rga) {
+    if (rga && rga->pool) rga->pool->f_free(rga->pool, rga);
+}
 
 int ml_rga_resize(ml_rga_t *rga,
                   const void *s, int sw, int sh,

@@ -273,8 +273,12 @@ ml_codec_create(const ml_codec_cfg_t *cfg, ml_pool_t *pool)
     MppCodingType coding;
     MppRet ret;
 
-    c = calloc(1, sizeof(*c));
+    if (!cfg) return NULL;
+    if (!pool) return NULL;
+
+    c = pool->f_alloc(pool, sizeof(*c));
     if (!c) return NULL;
+    memset(c, 0, sizeof(*c));
 
     if (cfg)
         c->user_cfg = *cfg;
@@ -287,7 +291,7 @@ ml_codec_create(const ml_codec_cfg_t *cfg, ml_pool_t *pool)
     coding = to_mpp_coding(c->user_cfg.enc_type);
     if (coding == MPP_VIDEO_CodingUnused) {
         set_err(c, "unsupported codec type");
-        free(c);
+        pool->f_free(pool, c);
         return NULL;
     }
 
@@ -306,7 +310,7 @@ ml_codec_create(const ml_codec_cfg_t *cfg, ml_pool_t *pool)
     if (ret != MPP_OK) {
         set_err(c, "mpp_create failed");
         teardown_drm_buffers(c);
-        free(c);
+        pool->f_free(pool, c);
         return NULL;
     }
 
@@ -316,7 +320,7 @@ ml_codec_create(const ml_codec_cfg_t *cfg, ml_pool_t *pool)
         set_err(c, "mpp_init failed");
         mpp_destroy(c->ctx);
         teardown_drm_buffers(c);
-        free(c);
+        pool->f_free(pool, c);
         return NULL;
     }
 
@@ -326,7 +330,7 @@ ml_codec_create(const ml_codec_cfg_t *cfg, ml_pool_t *pool)
         set_err(c, "mpp_enc_cfg_init failed");
         mpp_destroy(c->ctx);
         teardown_drm_buffers(c);
-        free(c);
+        pool->f_free(pool, c);
         return NULL;
     }
 
@@ -383,7 +387,7 @@ ml_codec_create(const ml_codec_cfg_t *cfg, ml_pool_t *pool)
         set_err(c, "MPP_ENC_SET_CFG failed");
         mpp_destroy(c->ctx);
         teardown_drm_buffers(c);
-        free(c);
+        pool->f_free(pool, c);
         return NULL;
     }
 
@@ -401,7 +405,7 @@ ml_codec_create(const ml_codec_cfg_t *cfg, ml_pool_t *pool)
         set_err(c, "set non-block timeout failed");
         mpp_destroy(c->ctx);
         teardown_drm_buffers(c);
-        free(c);
+        pool->f_free(pool, c);
         return NULL;
     }
 
@@ -413,7 +417,7 @@ ml_codec_create(const ml_codec_cfg_t *cfg, ml_pool_t *pool)
             void *ptr = mpp_packet_get_data(pkt);
             size_t len = mpp_packet_get_length(pkt);
             if (ptr && len > 0) {
-                c->extradata = malloc(len);
+                c->extradata = pool->f_alloc(pool, len);
                 if (c->extradata) {
                     memcpy(c->extradata, ptr, len);
                     c->extradata_len = len;
@@ -444,14 +448,15 @@ ml_codec_destroy(ml_codec_t *c)
                 mpp_frame_deinit(&eos);
             }
         }
+        mpp_enc_cfg_deinit(&c->enc_cfg);
         mpp_destroy(c->ctx);
     }
 
     teardown_drm_buffers(c);
-    free(c->extradata);
-    free(c->pkt_data);
+    if (c->extradata) c->pool->f_free(c->pool, c->extradata);
+    if (c->pkt_data)   c->pool->f_free(c->pool, c->pkt_data);
     pthread_mutex_destroy(&c->lock);
-    free(c);
+    c->pool->f_free(c->pool, c);
 }
 
 /* ── send frame ───────────────────────────────────────────────────────── */
@@ -505,6 +510,7 @@ ml_codec_send_frame(ml_codec_t *c, ml_frame_t *frame)
 {
     MppFrame mf = NULL;
     MppBuffer buf = NULL;
+    int need_put = 0;
     MppRet ret;
 
     if (!c || !c->inited || !frame) return -1;
@@ -528,15 +534,16 @@ ml_codec_send_frame(ml_codec_t *c, ml_frame_t *frame)
     mpp_frame_set_fmt(mf, MPP_FMT_YUV420SP);
     mpp_frame_set_eos(mf, 0);
 
-    /* try DMA-BUF zero-copy path */
+    /* DMA-BUF zero-copy: mpp_buffer_get_fd acquires a new reference */
     if ((frame->flags & ML_FRAME_FLAG_DMABUF) && frame->fd[0] >= 0) {
         ret = mpp_buffer_get_fd(&buf, frame->fd[0]);
         if (ret == MPP_OK && buf) {
             mpp_frame_set_buffer(mf, buf);
+            need_put = 1;
         }
     }
 
-    /* use pre-allocated DRM buffer if DMA-BUF import failed */
+    /* pre-allocated DRM buffer: persistent, do NOT put per-frame */
     if (!buf && c->frame_buf) {
         void *dst = mpp_buffer_get_ptr(c->frame_buf);
         if (copy_nv12_to_mpp(dst, frame, c->hor_stride, c->ver_stride) == 0) {
@@ -566,12 +573,17 @@ ml_codec_send_frame(ml_codec_t *c, ml_frame_t *frame)
         }
 
         mpp_frame_set_buffer(mf, buf);
+        need_put = 1;
     }
 
     mpp_frame_set_pts(mf, frame->timestamp / 1000);
 
     ret = c->mpi->put_frame(c->ctx, mf);
     mpp_frame_deinit(&mf);
+
+    /* release our temporary reference — MPP internally retains if needed */
+    if (need_put)
+        mpp_buffer_put(buf);
 
     pthread_mutex_unlock(&c->lock);
     return (ret == MPP_OK) ? 0 : -1;
@@ -605,14 +617,17 @@ ml_codec_receive_packet(ml_codec_t *c, ml_codec_pkt_t *pkt)
     {
         size_t len = mpp_packet_get_length(mp);
         if (len > c->pkt_data_cap) {
-            uint8_t *tmp = realloc(c->pkt_data, len);
+            size_t new_cap = c->pkt_data_cap ? c->pkt_data_cap * 2 : len;
+            if (new_cap < len) new_cap = len;
+            uint8_t *tmp = c->pool->f_alloc(c->pool, new_cap);
             if (!tmp) {
                 mpp_packet_deinit(&mp);
                 pthread_mutex_unlock(&c->lock);
                 return -1;
             }
+            if (c->pkt_data) c->pool->f_free(c->pool, c->pkt_data);
             c->pkt_data     = tmp;
-            c->pkt_data_cap = len;
+            c->pkt_data_cap = new_cap;
         }
         memcpy(c->pkt_data, mpp_packet_get_data(mp), len);
         pkt->data = c->pkt_data;

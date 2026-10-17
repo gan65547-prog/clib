@@ -106,6 +106,7 @@ CORE_SOURCES = \
     src/ml_range_finder.c \
     src/ml_rbtree.c \
     src/ml_ringbuf.c \
+    src/ml_rtsp_server.c \
     src/ml_set_rbtree.c \
     src/ml_shm_pool.c \
     src/ml_stream.c \

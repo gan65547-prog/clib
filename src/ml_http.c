@@ -32,20 +32,23 @@ enum {
 
 /* ── init ───────────────────────────────────────────────────────────── */
 
-void
-ml_http_request_init(ml_http_request_t *r)
+int
+ml_http_request_init(ml_http_request_t *r, ml_pool_t *pool)
 {
+    if (!r || !pool) return -1;
     ml_memzero(r, sizeof(*r));
-    r->m_buf = (char *)malloc(ML_HTTP_BUF_SIZE);
-    if (r->m_buf)
-        r->m_buf_size = ML_HTTP_BUF_SIZE;
+    r->m_buf = (char *)pool->f_alloc(pool, ML_HTTP_BUF_SIZE);
+    if (!r->m_buf) return -1;
+    r->m_buf_size = ML_HTTP_BUF_SIZE;
+    r->m_pool = pool;
+    return 0;
 }
 
 void
 ml_http_request_free(ml_http_request_t *r)
 {
     if (!r) return;
-    free(r->m_buf);
+    if (r->m_buf) r->m_pool->f_free(r->m_pool, r->m_buf);
     r->m_buf      = NULL;
     r->m_buf_size = 0;
 }

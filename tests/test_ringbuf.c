@@ -8,6 +8,7 @@
 #include "test_framework.h"
 #include "../include/ml_cints.h"
 #include "../include/ml_ringbuf.h"
+#include "../include/ml_pool.h"
 #include "../src/ml_ringbuf.c"
 
 /* Helper: create a heap-backed ring buffer for testing
@@ -15,7 +16,7 @@
  */
 static void ring_heap_create(ml_kring_t *kr, ml_uint_t ring_size) {
     ml_uint_t total = sizeof(ml_kbuff_t) + ring_size;
-    ml_uint8_t *buf = (ml_uint8_t*)malloc(total);
+    ml_uint8_t *buf = (ml_uint8_t*)ml_alloc(total);
     ASSERT_PTR_NOT_NULL(buf, "malloc ring buffer should succeed");
 
     ml_memzero(buf, total);
@@ -30,7 +31,7 @@ static void ring_heap_create(ml_kring_t *kr, ml_uint_t ring_size) {
 
 static void ring_heap_destroy(ml_kring_t *kr) {
     pthread_mutex_destroy(&kr->m_kbuff->m_mutex);
-    free(kr->m_mmap.m_addr);
+    ml_free(kr->m_mmap.m_addr);
     ml_memzero(kr, sizeof(*kr));
 }
 

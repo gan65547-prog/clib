@@ -63,14 +63,6 @@ static uint32_t ml_to_v4l2_pixfmt(int ml_fmt)
     }
 }
 
-/* ── V4L2 release callback ────────────────────────────────────────────── */
-
-static void v4l2_dmabuf_release(void *owner, int fd)
-{
-    (void)owner;
-    if (fd >= 0) close(fd);
-}
-
 /* ── lifecycle ────────────────────────────────────────────────────────── */
 
 ml_camera_t *
@@ -83,10 +75,11 @@ ml_camera_v4l2_create(const ml_camera_cfg_t *cfg, ml_pool_t *pool)
     uint32_t v4l2_fmt;
     int i;
 
-    if (!cfg || !cfg->device) return NULL;
+    if (!cfg || !cfg->device || !pool) return NULL;
 
-    cam = calloc(1, sizeof(*cam));
+    cam = pool->f_alloc(pool, sizeof(*cam));
     if (!cam) return NULL;
+    memset(cam, 0, sizeof(*cam));
 
     cam->backend = ML_CAMERA_BACKEND_V4L2;
     cam->cfg     = *cfg;
@@ -98,7 +91,7 @@ ml_camera_v4l2_create(const ml_camera_cfg_t *cfg, ml_pool_t *pool)
     cam->dev_fd = open(cfg->device, O_RDWR | O_NONBLOCK);
     if (cam->dev_fd < 0) {
         ml_camera_set_err(cam, "open device failed");
-        free(cam);
+        pool->f_free(pool, cam);
         return NULL;
     }
 
@@ -107,14 +100,14 @@ ml_camera_v4l2_create(const ml_camera_cfg_t *cfg, ml_pool_t *pool)
     if (xioctl(cam->dev_fd, VIDIOC_QUERYCAP, &cap) < 0) {
         ml_camera_set_err(cam, "VIDIOC_QUERYCAP failed");
         close(cam->dev_fd);
-        free(cam);
+        pool->f_free(pool, cam);
         return NULL;
     }
 
     if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
         ml_camera_set_err(cam, "not a video capture device");
         close(cam->dev_fd);
-        free(cam);
+        pool->f_free(pool, cam);
         return NULL;
     }
 
@@ -130,7 +123,7 @@ ml_camera_v4l2_create(const ml_camera_cfg_t *cfg, ml_pool_t *pool)
     if (xioctl(cam->dev_fd, VIDIOC_S_FMT, &fmt) < 0) {
         ml_camera_set_err(cam, "VIDIOC_S_FMT failed");
         close(cam->dev_fd);
-        free(cam);
+        pool->f_free(pool, cam);
         return NULL;
     }
 
@@ -147,17 +140,18 @@ ml_camera_v4l2_create(const ml_camera_cfg_t *cfg, ml_pool_t *pool)
     if (xioctl(cam->dev_fd, VIDIOC_REQBUFS, &req) < 0) {
         ml_camera_set_err(cam, "VIDIOC_REQBUFS failed");
         close(cam->dev_fd);
-        free(cam);
+        pool->f_free(pool, cam);
         return NULL;
     }
 
     cam->num_bufs = req.count;
-    cam->bufs = calloc(cam->num_bufs, sizeof(ml_camera_v4l2_buf_t));
+    cam->bufs = pool->f_alloc(pool, (size_t)cam->num_bufs * sizeof(ml_camera_v4l2_buf_t));
     if (!cam->bufs) {
         close(cam->dev_fd);
-        free(cam);
+        pool->f_free(pool, cam);
         return NULL;
     }
+    memset(cam->bufs, 0, (size_t)cam->num_bufs * sizeof(ml_camera_v4l2_buf_t));
 
     /* mmap each buffer */
     for (i = 0; i < cam->num_bufs; i++) {
@@ -235,8 +229,8 @@ ml_camera_v4l2_destroy(ml_camera_t *cam)
         cam->dev_fd = -1;
     }
 
-    free(cam->bufs);
-    free(cam);
+    if (cam->bufs) cam->pool->f_free(cam->pool, cam->bufs);
+    if (cam->pool) cam->pool->f_free(cam->pool, cam);
 }
 
 /* ── start / stop ─────────────────────────────────────────────────────── */
@@ -364,7 +358,7 @@ ml_camera_v4l2_read(ml_camera_t *cam, ml_frame_t *frame, int timeout_ms)
             buf.timestamp.tv_sec * 1000000ULL + buf.timestamp.tv_usec,
             buf.sequence,
             ML_FRAME_FLAG_DMABUF,
-            cam, v4l2_dmabuf_release
+            NULL, NULL
         );
     } else {
         ml_frame_from_mem(
@@ -404,8 +398,8 @@ ml_camera_v4l2_frame_release(ml_camera_t *cam, ml_frame_t *frame)
     }
 
     /* QBUF: return the exact buffer to the V4L2 driver queue.
-     * The frame release callback (v4l2_dmabuf_release or NULL)
-     * only handles DMA-BUF fd cleanup — it does NOT QBUF. */
+     * The camera object owns EXPBUF fds (closed in destroy), so
+     * the frame release does only QBUF — no fd ownership transfer. */
     memset(&buf, 0, sizeof(buf));
     buf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     buf.memory = V4L2_MEMORY_MMAP;

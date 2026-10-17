@@ -5,7 +5,10 @@
 #include <strings.h>
 #include "test_framework.h"
 #include "../include/ml_http.h"
+#include "../include/ml_pool.h"
 #include "../src/ml_http.c"
+
+static ml_pool_t g_pool;
 
 /* ── request parsing ────────────────────────────────────────────────── */
 
@@ -17,7 +20,7 @@ static void test_parse_get_simple(void)
         "\r\n";
 
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
 
     int n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
@@ -38,7 +41,7 @@ static void test_parse_post_with_body(void)
         "{\"name\":\"test\"}";
 
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
 
     int n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
@@ -67,7 +70,7 @@ static void test_parse_all_methods(void)
 
     for (i = 0; i < 4; i++) {
         ml_http_request_t req;
-        ml_http_request_init(&req);
+        ml_http_request_init(&req, &g_pool);
         ml_int_t n = ml_http_parse(&req, tests[i], strlen(tests[i]));
         ASSERT(n > 0, "parse should succeed");
         ASSERT(req.m_method == expected[i], "method should match");
@@ -85,7 +88,7 @@ static void test_parse_multiple_headers(void)
         "\r\n";
 
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
     int n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
     ASSERT_EQ(req.m_header_count, 3, "should have 3 headers");
@@ -96,7 +99,7 @@ static void test_parse_incomplete_request(void)
 {
     const char *raw = "GET /api";
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
     ml_int_t n = ml_http_parse(&req, raw, (ml_int_t)strlen(raw));
     ASSERT_EQ(n, 0, "incomplete should return 0 (need more data)");
     ml_http_request_free(&req);
@@ -110,7 +113,7 @@ static void test_parse_with_query(void)
         "\r\n";
 
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
     int n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
     ASSERT_STR_EQ(req.m_path, "/api/search", "path without query");
@@ -124,7 +127,7 @@ static void test_parse_with_query(void)
 static void test_parse_null_rejects(void)
 {
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
     ASSERT(ml_http_parse(NULL, "GET / HTTP/1.1\r\n\r\n", 18) < 0,
            "NULL request should fail");
     ASSERT(ml_http_parse(&req, NULL, 10) < 0, "NULL data should fail");
@@ -143,7 +146,7 @@ static void test_header_get_exact(void)
         "\r\n";
 
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
     int n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
 
@@ -168,7 +171,7 @@ static void test_header_get_case_insensitive(void)
         "\r\n";
 
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
     int n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
 
@@ -183,7 +186,7 @@ static void test_header_get_null_checks(void)
     ASSERT_PTR_NULL(ml_http_header_get(NULL, "X"), "NULL req → NULL");
     {
         ml_http_request_t req;
-        ml_http_request_init(&req);
+        ml_http_request_init(&req, &g_pool);
         ASSERT_PTR_NULL(ml_http_header_get(&req, NULL), "NULL name → NULL");
         ml_http_request_free(&req);
     }
@@ -312,7 +315,7 @@ static void test_multipart_single_text_field(void)
         "--boundary--\r\n";
 
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
     req.m_body     = (char *)body;
     req.m_body_len = (int)strlen(body);
 
@@ -337,7 +340,7 @@ static void test_multipart_file_upload(void)
         "\r\n--boundary--\r\n";
 
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
     req.m_body     = (char *)body;
     req.m_body_len = (int)strlen(body);
 
@@ -366,7 +369,7 @@ static void test_multipart_mixed_fields(void)
         "--boundary--\r\n";
 
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
     req.m_body     = (char *)body;
     req.m_body_len = (int)strlen(body);
 
@@ -389,7 +392,7 @@ static void test_multipart_null_checks(void)
 
     {
         ml_http_request_t req;
-        ml_http_request_init(&req);
+        ml_http_request_init(&req, &g_pool);
         req.m_body     = "data";
         req.m_body_len = 4;
         ASSERT(ml_http_parse_multipart(&req, NULL, parts, 4) < 0,
@@ -407,7 +410,7 @@ static void test_multipart_null_checks(void)
 static void test_multipart_empty_body(void)
 {
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
     req.m_body     = "";
     req.m_body_len = 0;
 
@@ -421,6 +424,8 @@ static void test_multipart_empty_body(void)
 
 void test_http_parser_suite(void)
 {
+    ml_pool_create(&g_pool, 0);
+
     TEST_SUITE("ml_http — HTTP/1.1 parser + multipart");
 
     RUN_TEST("parse GET simple",           { test_parse_get_simple(); });
@@ -451,4 +456,6 @@ void test_http_parser_suite(void)
     RUN_TEST("multipart mixed fields",     { test_multipart_mixed_fields(); });
     RUN_TEST("multipart null checks",      { test_multipart_null_checks(); });
     RUN_TEST("multipart empty body",       { test_multipart_empty_body(); });
+
+    ml_pool_destroy(&g_pool);
 }

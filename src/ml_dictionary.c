@@ -21,18 +21,12 @@ static char ml_dict_tombstone_marker;
 
 static void *dict_alloc(ml_pool_t *pool, size_t size)
 {
-    if (pool)
-        return pool->f_alloc(pool, size);
-    return malloc(size);
+    return pool->f_alloc(pool, size);
 }
 
 static void dict_free(ml_pool_t *pool, void *p)
 {
-    if (!p) return;
-    if (pool)
-        pool->f_free(pool, p);
-    else
-        free(p);
+    if (p) pool->f_free(pool, p);
 }
 
 static char *dict_strdup(ml_pool_t *pool, const char *s)
@@ -125,6 +119,7 @@ ml_dictionary_t *ml_dictionary_new(size_t size, ml_pool_t *pool)
 {
     ml_dictionary_t *d;
 
+    if (!pool) return NULL;
     if (size < ML_DICT_MINSZ) size = ML_DICT_MINSZ;
     d = (ml_dictionary_t *)dict_alloc(pool, sizeof(*d));
     if (d) {

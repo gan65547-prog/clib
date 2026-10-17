@@ -1,6 +1,9 @@
 #include "test_framework.h"
 #include "ml_cv_math.h"
+#include "../include/ml_pool.h"
 #include <math.h>
+
+static ml_pool_t g_pool;
 
 static int float_eq(float a, float b, float eps)
 {
@@ -383,10 +386,207 @@ static void test_best_match_by_iou(void)
     ASSERT(best_iou > 0.8f, "best iou > 0.8");
 }
 
+/* ── NMS ─────────────────────────────────────────────────────────── */
+
+static void test_nms_single_box(void)
+{
+    ml_nms_box_t boxes[1] = {{0, 0, 10, 10, 0.9f, 0}};
+    int n = ml_nms_multi_class(boxes, 1, 0.5f, &g_pool);
+    ASSERT_EQ(n, 1, "single box kept");
+}
+
+static void test_nms_suppress_duplicate(void)
+{
+    ml_nms_box_t boxes[3] = {
+        {0, 0, 10, 10, 0.9f, 0},
+        {1, 1, 10, 10, 0.8f, 0},   /* high IoU → suppressed */
+        {0, 0, 10, 10, 0.7f, 0},   /* high IoU → suppressed */
+    };
+    int n = ml_nms_multi_class(boxes, 3, 0.5f, &g_pool);
+    ASSERT_EQ(n, 1, "only highest score kept");
+}
+
+static void test_nms_keep_different_class(void)
+{
+    ml_nms_box_t boxes[2] = {
+        {0, 0, 10, 10, 0.9f, 0},
+        {0, 0, 10, 10, 0.8f, 1},   /* same box, different class → kept */
+    };
+    int n = ml_nms_multi_class(boxes, 2, 0.5f, &g_pool);
+    ASSERT_EQ(n, 2, "different classes both kept");
+}
+
+static void test_nms_keep_far(void)
+{
+    ml_nms_box_t boxes[2] = {
+        {0,   0, 10, 10, 0.9f, 0},
+        {100, 0, 10, 10, 0.8f, 0},  /* far away → kept */
+    };
+    int n = ml_nms_multi_class(boxes, 2, 0.5f, &g_pool);
+    ASSERT_EQ(n, 2, "far boxes both kept");
+}
+
+static void test_nms_empty(void)
+{
+    ASSERT_EQ(ml_nms_multi_class(NULL, 0, 0.5f, &g_pool), 0, "empty → 0");
+}
+
+static void test_nms_no_suppress(void)
+{
+    ml_nms_box_t boxes[3] = {
+        {0,   0, 10, 10, 0.9f, 0},
+        {20,  0, 10, 10, 0.8f, 0},
+        {100, 0, 10, 10, 0.7f, 0},
+    };
+    int n = ml_nms_multi_class(boxes, 3, 0.5f, &g_pool);
+    ASSERT_EQ(n, 3, "no overlap → all kept");
+}
+
+/* ── Kalman1D ─────────────────────────────────────────────────────── */
+
+static void test_kalman_init(void)
+{
+    ml_kalman1d_t kf;
+    ml_kalman1d_init(&kf, 0.1f, 0.5f, 10.0f, 1.0f);
+    ASSERT_FLOAT_EQ(kf.x, 10.0f, 0.001f, "init x");
+    ASSERT_FLOAT_EQ(kf.v, 0.0f, 0.001f, "init v=0");
+}
+
+static void test_kalman_null_safe(void)
+{
+    ml_kalman1d_init(NULL, 0.1f, 0.5f, 0.0f, 0.0f);
+    ml_kalman1d_predict(NULL, 1.0f);
+    ml_kalman1d_update(NULL, 5.0f);
+    ASSERT_FLOAT_EQ(ml_kalman1d_estimate(NULL), 0.0f, 0.001f, "null estimate=0");
+    ASSERT_FLOAT_EQ(ml_kalman1d_velocity(NULL), 0.0f, 0.001f, "null velocity=0");
+    /* all should be no-ops without crash */
+}
+
+static void test_kalman_predict(void)
+{
+    ml_kalman1d_t kf;
+    ml_kalman1d_init(&kf, 0.0f, 1.0f, 10.0f, 1.0f);
+    ml_kalman1d_predict(&kf, 1.0f);
+    ASSERT_FLOAT_EQ(ml_kalman1d_estimate(&kf), 10.0f, 0.001f, "predict x unchanged (v=0)");
+}
+
+static void test_kalman_update_converges(void)
+{
+    ml_kalman1d_t kf;
+    ml_kalman1d_init(&kf, 0.01f, 0.1f, 0.0f, 10.0f);
+    int i;
+    for (i = 0; i < 20; i++) {
+        ml_kalman1d_predict(&kf, 1.0f);
+        ml_kalman1d_update(&kf, 5.0f);
+    }
+    ASSERT(ml_kalman1d_estimate(&kf) > 4.0f, "converges toward 5");
+    ASSERT(ml_kalman1d_estimate(&kf) < 6.0f, "within range");
+}
+
+static void test_kalman_velocity_tracks(void)
+{
+    ml_kalman1d_t kf;
+    ml_kalman1d_init(&kf, 0.01f, 0.5f, 0.0f, 10.0f);
+    int i;
+    /* simulate constant velocity: measurement increases by 2 per step */
+    for (i = 0; i < 30; i++) {
+        ml_kalman1d_predict(&kf, 1.0f);
+        ml_kalman1d_update(&kf, 2.0f * (float)(i + 1));
+    }
+    ASSERT(ml_kalman1d_velocity(&kf) > 0.5f, "velocity positive");
+}
+
+static void test_kalman_reset(void)
+{
+    ml_kalman1d_t kf;
+    ml_kalman1d_init(&kf, 0.1f, 0.5f, 10.0f, 1.0f);
+    ml_kalman1d_predict(&kf, 1.0f);
+    ml_kalman1d_update(&kf, 20.0f);
+    ml_kalman1d_reset(&kf, 5.0f);
+    ASSERT_FLOAT_EQ(ml_kalman1d_estimate(&kf), 5.0f, 0.001f, "reset to 5");
+    ASSERT_FLOAT_EQ(ml_kalman1d_velocity(&kf), 0.0f, 0.001f, "reset v=0");
+}
+
+/* ── letterbox ────────────────────────────────────────────────────── */
+
+static void test_letterbox_identity(void)
+{
+    float x = 320.0f, y = 240.0f;
+    ml_letterbox_to_source(&x, &y, 640, 480, 640, 480);
+    ASSERT_FLOAT_EQ(x, 320.0f, 0.01f, "x unchanged");
+    ASSERT_FLOAT_EQ(y, 240.0f, 0.01f, "y unchanged");
+}
+
+static void test_letterbox_square_pad(void)
+{
+    /* 640×480 → 640×640: letterbox pads top/bottom 80px each */
+    /* model y=120 → source y = (120 - 80) / 1.0 = 40 */
+    float x = 320.0f, y = 120.0f;
+    ml_letterbox_to_source(&x, &y, 640, 480, 640, 640);
+    ASSERT_FLOAT_EQ(x, 320.0f, 0.01f, "x unchanged");
+    ASSERT_FLOAT_EQ(y, 40.0f, 0.01f, "y=40 after removing top pad");
+}
+
+static void test_letterbox_null_ptr(void)
+{
+    float x = 1.0f;
+    ml_letterbox_to_source(NULL, &x, 640, 480, 640, 640);
+    ml_letterbox_to_source(&x, NULL, 640, 480, 640, 640);
+    /* should be no-ops without crash */
+}
+
+static void test_letterbox_zero_dims(void)
+{
+    float x = 100.0f, y = 100.0f;
+    float orig_x = x, orig_y = y;
+    ml_letterbox_to_source(&x, &y, 0, 480, 640, 640);  /* src_w=0 */
+    ASSERT_FLOAT_EQ(x, orig_x, 0.001f, "unchanged on zero src_w");
+    ml_letterbox_to_source(&x, &y, 640, 0, 640, 640);  /* src_h=0 */
+    ml_letterbox_to_source(&x, &y, 640, 480, 0, 640);  /* model_w=0 */
+    ml_letterbox_to_source(&x, &y, 640, 480, 640, 0);  /* model_h=0 */
+}
+
+/* ── clamp ────────────────────────────────────────────────────────── */
+
+static void test_clamp_noop(void)
+{
+    ml_rect_t r = {10, 10, 20, 20};
+    ml_rect_t c = ml_rect_clamp(r, 640.0f, 480.0f);
+    ASSERT_FLOAT_EQ(c.x, 10.0f, 0.001f, "x unchanged");
+    ASSERT_FLOAT_EQ(c.width, 20.0f, 0.001f, "w unchanged");
+}
+
+static void test_clamp_negative_x(void)
+{
+    ml_rect_t r = {-5, 10, 20, 20};
+    ml_rect_t c = ml_rect_clamp(r, 640.0f, 480.0f);
+    ASSERT_FLOAT_EQ(c.x, 0.0f, 0.001f, "x clamped to 0");
+    ASSERT_FLOAT_EQ(c.width, 15.0f, 0.001f, "width shrunk by offset");
+}
+
+static void test_clamp_exceeds_image(void)
+{
+    ml_rect_t r = {630, 470, 20, 20};
+    ml_rect_t c = ml_rect_clamp(r, 640.0f, 480.0f);
+    ASSERT_FLOAT_EQ(c.x, 630.0f, 0.001f, "x unchanged");
+    ASSERT_FLOAT_EQ(c.width, 10.0f, 0.001f, "width clamped to img edge");
+    ASSERT_FLOAT_EQ(c.height, 10.0f, 0.001f, "height clamped to img edge");
+}
+
+static void test_clamp_zero_size(void)
+{
+    ml_rect_t r = {-10, -10, 5, 5};
+    ml_rect_t c = ml_rect_clamp(r, 640.0f, 480.0f);
+    ASSERT_FLOAT_EQ(c.x, 0.0f, 0.001f, "negative x → 0");
+    ASSERT_FLOAT_EQ(c.width, 0.0f, 0.001f, "width clipped to 0");
+}
+
 /* ── suite ──────────────────────────────────────────────────────── */
 
 void test_cv_math_suite(void)
 {
+    ml_pool_create(&g_pool, 0);
+
     TEST_SUITE("ml_cv_math");
 
     RUN_TEST("rect_inter - overlapping",   test_rect_inter_overlap());
@@ -446,4 +646,30 @@ void test_cv_math_suite(void)
     RUN_TEST("euclidean_distance - null",  test_euclid_null());
 
     RUN_TEST("scenario - best iou match",  test_best_match_by_iou());
+
+    RUN_TEST("nms - single box",           test_nms_single_box());
+    RUN_TEST("nms - suppress duplicate",   test_nms_suppress_duplicate());
+    RUN_TEST("nms - keep different class", test_nms_keep_different_class());
+    RUN_TEST("nms - keep far boxes",       test_nms_keep_far());
+    RUN_TEST("nms - empty input",          test_nms_empty());
+    RUN_TEST("nms - no suppression",       test_nms_no_suppress());
+
+    RUN_TEST("kalman - init",              test_kalman_init());
+    RUN_TEST("kalman - null safe",         test_kalman_null_safe());
+    RUN_TEST("kalman - predict",           test_kalman_predict());
+    RUN_TEST("kalman - update converges",  test_kalman_update_converges());
+    RUN_TEST("kalman - velocity tracks",   test_kalman_velocity_tracks());
+    RUN_TEST("kalman - reset",             test_kalman_reset());
+
+    RUN_TEST("letterbox - identity",       test_letterbox_identity());
+    RUN_TEST("letterbox - square pad",     test_letterbox_square_pad());
+    RUN_TEST("letterbox - null ptr",       test_letterbox_null_ptr());
+    RUN_TEST("letterbox - zero dims",      test_letterbox_zero_dims());
+
+    RUN_TEST("clamp - no-op",              test_clamp_noop());
+    RUN_TEST("clamp - negative x",         test_clamp_negative_x());
+    RUN_TEST("clamp - exceeds image",      test_clamp_exceeds_image());
+    RUN_TEST("clamp - zero size",          test_clamp_zero_size());
+
+    ml_pool_destroy(&g_pool);
 }

@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include "test_framework.h"
 #include "../include/ml_iniparser.h"
+#include "../include/ml_pool.h"
 #include "../include/ml_string.h"
 
 static const char *sample_ini =
@@ -18,6 +19,8 @@ static const char *sample_ini =
     "; comment line\n"
     "pi = 3.14\n";
 
+static ml_pool_t g_pool;
+
 static void write_temp(const char *content, char *path, int path_sz)
 {
     int fd;
@@ -29,13 +32,15 @@ static void write_temp(const char *content, char *path, int path_sz)
 
 void test_iniparser_suite(void)
 {
+    ml_pool_create(&g_pool, 0);
+
     TEST_SUITE("INI Parser");
 
     RUN_TEST("load and parse sections", {
         char path[256];
         write_temp(sample_ini, path, sizeof(path));
 
-        ml_dictionary_t *ini = ml_ini_load(path);
+        ml_dictionary_t *ini = ml_ini_load(path, &g_pool);
         ASSERT_PTR_NOT_NULL(ini, "load");
 
         int nsec = ml_ini_get_nsec(ini);
@@ -57,7 +62,7 @@ void test_iniparser_suite(void)
         char path[256];
         write_temp(sample_ini, path, sizeof(path));
 
-        ml_dictionary_t *ini = ml_ini_load(path);
+        ml_dictionary_t *ini = ml_ini_load(path, &g_pool);
         ASSERT_PTR_NOT_NULL(ini, "load");
 
         ASSERT_STR_EQ(ml_ini_get_string(ini, "server:host", NULL), "192.168.0.1", "host");
@@ -72,7 +77,7 @@ void test_iniparser_suite(void)
         char path[256];
         write_temp(sample_ini, path, sizeof(path));
 
-        ml_dictionary_t *ini = ml_ini_load(path);
+        ml_dictionary_t *ini = ml_ini_load(path, &g_pool);
         ASSERT_PTR_NOT_NULL(ini, "load");
 
         double pi = ml_ini_get_double(ini, "database:pi", -1.0);
@@ -86,7 +91,7 @@ void test_iniparser_suite(void)
         char path[256];
         write_temp("[s]\na = hello\n", path, sizeof(path));
 
-        ml_dictionary_t *ini = ml_ini_load(path);
+        ml_dictionary_t *ini = ml_ini_load(path, &g_pool);
         ASSERT_PTR_NOT_NULL(ini, "load");
 
         ASSERT_STR_EQ(ml_ini_get_string(ini, "s:nope", "FB"), "FB", "string def");
@@ -101,7 +106,7 @@ void test_iniparser_suite(void)
         char path[256];
         write_temp("[db]\nuser=root\npass=123\n", path, sizeof(path));
 
-        ml_dictionary_t *ini = ml_ini_load(path);
+        ml_dictionary_t *ini = ml_ini_load(path, &g_pool);
         ASSERT_PTR_NOT_NULL(ini, "load");
 
         ASSERT_EQ(ml_ini_get_sec_nkeys(ini, "db"), 2, "2 keys in db");
@@ -118,7 +123,7 @@ void test_iniparser_suite(void)
         char path[256];
         write_temp("[net]\nip=1.1.1.1\n", path, sizeof(path));
 
-        ml_dictionary_t *ini = ml_ini_load(path);
+        ml_dictionary_t *ini = ml_ini_load(path, &g_pool);
         ASSERT_PTR_NOT_NULL(ini, "load");
 
         ASSERT_EQ(ml_ini_find_entry(ini, "net:ip"), 1, "found");
@@ -129,7 +134,7 @@ void test_iniparser_suite(void)
     });
 
     RUN_TEST("set and unset", {
-        ml_dictionary_t *d = ml_dictionary_new(0, NULL);
+        ml_dictionary_t *d = ml_dictionary_new(0, &g_pool);
         ml_ini_set(d, "s:key", "val");
         ASSERT_STR_EQ(ml_ini_get_string(d, "s:key", NULL), "val", "set");
 
@@ -140,8 +145,16 @@ void test_iniparser_suite(void)
     });
 
     RUN_TEST("load non-existent file returns NULL", {
-        ml_dictionary_t *ini = ml_ini_load("/tmp/no_such_ini_file_42.ini");
+        ml_dictionary_t *ini = ml_ini_load("/tmp/no_such_ini_file_42.ini", &g_pool);
         ASSERT_PTR_NULL(ini, "no file");
+    });
+
+    RUN_TEST("load NULL filename returns NULL", {
+        ASSERT_PTR_NULL(ml_ini_load(NULL, &g_pool), "NULL path");
+    });
+
+    RUN_TEST("load NULL pool returns NULL", {
+        ASSERT_PTR_NULL(ml_ini_load("/tmp/no_such_ini_file_42.ini", NULL), "NULL pool");
     });
 
     RUN_TEST("null parameter checks", {
@@ -152,4 +165,6 @@ void test_iniparser_suite(void)
         ASSERT_EQ(ml_ini_get_bool(NULL, "k", 3), 3, "getbool NULL");
         ASSERT_EQ(ml_ini_find_entry(NULL, "k"), 0, "find NULL");
     });
+
+    ml_pool_destroy(&g_pool);
 }

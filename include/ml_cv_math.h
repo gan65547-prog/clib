@@ -12,6 +12,7 @@
 #define __ML_CV_MATH_H__
 
 #include <stdint.h>
+#include "ml_pool.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -72,7 +73,7 @@ typedef struct {
     uint32_t  class_id;
 } ml_nms_box_t;
 
-int ml_nms_multi_class(ml_nms_box_t *boxes, int count, float iou_threshold);
+int ml_nms_multi_class(ml_nms_box_t *boxes, int count, float iou_threshold, ml_pool_t *pool);
 
 /* ── coordinate transform ──────────────────────────────────────────── */
 

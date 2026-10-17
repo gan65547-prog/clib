@@ -13,7 +13,8 @@
 #ifndef __ML_POOL_H__
 #define __ML_POOL_H__
 
-
+#include <stdlib.h>
+#include <string.h>
 #include "ml_types.h"
 #include "ml_container.h"
 
@@ -138,7 +139,10 @@ struct ml_pool_s {
 
 
 #define ml_alloc(n)                                malloc(n)
+#define ml_calloc(n, s)                            calloc(n, s)
+#define ml_realloc(p, n)                           realloc(p, n)
 #define ml_free                                    free
+#define ml_strdup(s)                               strdup(s)  /* deprecated: use ml_pool_strdup */
 #define ml_memzero(buf, n)                         (void) memset(buf, 0, n)
 #define ml_memset(buf, c, n)                       (void) memset(buf, c, n)
 #define ml_memcpy(s, d, l)                         (void) memcpy(s, d, l)
@@ -157,6 +161,10 @@ extern int  ml_pool_create(ml_pool_t * pool, ml_uint64_t size);
 
 /* 内存池析构函数，销毁内存池 */
 extern void ml_pool_destroy(ml_pool_t * pool);
+
+/* pool-owned string duplication — allocated from pool, caller must not free */
+extern char *ml_pool_strdup(ml_pool_t *pool, const char *s);
+extern char *ml_pool_strndup(ml_pool_t *pool, const char *s, size_t n);
 
 #ifdef __cplusplus
 }

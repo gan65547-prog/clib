@@ -300,3 +300,32 @@ void ml_pool_destroy(ml_pool_t * pool)
 }
 
 
+char *ml_pool_strdup(ml_pool_t *pool, const char *s)
+{
+    size_t len;
+    char *copy;
+
+    if (!pool || !s) return NULL;
+    len = strlen(s) + 1;
+    copy = pool->f_alloc(pool, len);
+    if (copy) memcpy(copy, s, len);
+    return copy;
+}
+
+
+char *ml_pool_strndup(ml_pool_t *pool, const char *s, size_t n)
+{
+    size_t len;
+    char *copy;
+
+    if (!pool || !s) return NULL;
+    for (len = 0; len < n && s[len]; len++) {}
+    copy = pool->f_alloc(pool, len + 1);
+    if (copy) {
+        memcpy(copy, s, len);
+        copy[len] = '\0';
+    }
+    return copy;
+}
+
+

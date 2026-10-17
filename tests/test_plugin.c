@@ -16,9 +16,9 @@
 #include "../include/ml_string.h"
 #include "../include/ml_log.h"
 #include "../include/ml_timer.h"
-#include "../include/mlfw/mlfw_module.h"
-#include "../include/mlfw/mlfw_plugin.h"
-#include "../include/mlfw/mlfw_process.h"
+#include "../../mlfw/include/mlfw/mlfw_module.h"
+#include "../../mlfw/include/mlfw/mlfw_plugin.h"
+#include "../../mlfw/include/mlfw/mlfw_process.h"
 #include "../../mlfw/src/mlfw_plugin.c"
 
 /* ---- Stubs for external dependencies ---- */

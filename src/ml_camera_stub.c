@@ -10,11 +10,14 @@
  */
 
 #include "ml_camera_private.h"
+#include "ml_pool.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 
-static void stub_destroy(ml_camera_t *cam) { free(cam); }
+static void stub_destroy(ml_camera_t *cam) {
+    if (cam && cam->pool) cam->pool->f_free(cam->pool, cam);
+}
 static int  stub_start(ml_camera_t *cam) { (void)cam; return -1; }
 static int  stub_stop(ml_camera_t *cam) { (void)cam; return -1; }
 static int  stub_read(ml_camera_t *cam, ml_frame_t *f, int to)
@@ -54,10 +57,11 @@ ml_camera_stub_create(const ml_camera_cfg_t *cfg, ml_pool_t *pool)
 {
     ml_camera_t *cam;
 
-    if (!cfg) return NULL;
+    if (!cfg || !pool) return NULL;
 
-    cam = calloc(1, sizeof(*cam));
+    cam = pool->f_alloc(pool, sizeof(*cam));
     if (!cam) return NULL;
+    memset(cam, 0, sizeof(*cam));
 
     cam->backend = cfg->backend;
     cam->ops     = &ml_camera_stub_ops;

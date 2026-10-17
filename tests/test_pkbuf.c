@@ -1,8 +1,5 @@
 /**
  * Test packet buffer (ml_pkbuf) allocation and ring buffer macros.
- *
- * ml_pkbuf_alloc uses ml_alloc() from ml_pool.h (malloc wrapper),
- * so it's testable without the full pool implementation.
  */
 #include "test_framework.h"
 #include "../include/ml_types.h"
@@ -11,8 +8,10 @@
 #include "../include/ml_pkbuf.h"
 #include "../src/ml_pkbuf.c"
 
+static ml_pool_t g_pool;
+
 static void test_pkbuf_alloc(void) {
-    ml_pkbuf_t *pkb = ml_pkbuf_alloc(128, NULL);
+    ml_pkbuf_t *pkb = ml_pkbuf_alloc(128, &g_pool);
     ASSERT_PTR_NOT_NULL(pkb, "pkbuf alloc should succeed");
 
     ASSERT_EQ(pkb->m_blen, 128, "buffer length should be 128");
@@ -35,7 +34,7 @@ static void test_pkbuf_alloc(void) {
 }
 
 static void test_pkbuf_write_read(void) {
-    ml_pkbuf_t *pkb = ml_pkbuf_alloc(64, NULL);
+    ml_pkbuf_t *pkb = ml_pkbuf_alloc(64, &g_pool);
     ASSERT_PTR_NOT_NULL(pkb, "pkbuf alloc should succeed");
 
     const char *test_data = "Hello Packet Buffer!";
@@ -56,7 +55,7 @@ static void test_pkbuf_multiple_alloc(void) {
 
     for (int i = 0; i < 10; i++) {
         sizes[i] = (i + 1) * 64;
-        bufs[i] = ml_pkbuf_alloc(sizes[i], NULL);
+        bufs[i] = ml_pkbuf_alloc(sizes[i], &g_pool);
         ASSERT_PTR_NOT_NULL(bufs[i], "each alloc should succeed");
         ASSERT_EQ(bufs[i]->m_blen, sizes[i], "size should match requested");
     }
@@ -91,7 +90,7 @@ static void test_pring_input_output(void) {
     ml_pkbuf_t *pkts[3];
 
     for (int i = 0; i < 3; i++) {
-        pkts[i] = ml_pkbuf_alloc(32, NULL);
+        pkts[i] = ml_pkbuf_alloc(32, &g_pool);
         ASSERT_PTR_NOT_NULL(pkts[i], "pkt alloc should succeed");
     }
 
@@ -135,7 +134,7 @@ static void test_pring_wrap(void) {
     ml_pkbuf_t *items[8];
 
     for (int i = 0; i < 8; i++) {
-        items[i] = ml_pkbuf_alloc(16, NULL);
+        items[i] = ml_pkbuf_alloc(16, &g_pool);
         ASSERT_PTR_NOT_NULL(items[i], "alloc should succeed");
         items[i]->m_ssid = (unsigned int)i;
     }
@@ -172,6 +171,8 @@ static void test_pring_wrap(void) {
 }
 
 void test_pkbuf_suite(void) {
+    ml_pool_create(&g_pool, 0);
+
     TEST_SUITE("Packet Buffer");
     RUN_TEST("alloc and init", test_pkbuf_alloc());
     RUN_TEST("write and read data", test_pkbuf_write_read());
@@ -179,4 +180,6 @@ void test_pkbuf_suite(void) {
     RUN_TEST("ring init", test_pring_init());
     RUN_TEST("ring input/output", test_pring_input_output());
     RUN_TEST("ring wrap-around", test_pring_wrap());
+
+    ml_pool_destroy(&g_pool);
 }

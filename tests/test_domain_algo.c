@@ -2,10 +2,13 @@
  * Domain algorithm primitive tests: counter, debounce, temporal_window, range_finder.
  */
 #include "test_framework.h"
+#include "../include/ml_pool.h"
 #include "ml_counter.h"
 #include "ml_debounce.h"
 #include "ml_temporal_window.h"
 #include "ml_range_finder.h"
+
+static ml_pool_t g_pool;
 #include <math.h>
 
 #define ASSERT_FLOAT(a, b, eps, msg) \
@@ -142,7 +145,7 @@ static void test_debounce_reset(void)
 static void test_twin_init(void)
 {
     ml_temporal_window_t w;
-    ml_temporal_window_init(&w, 10);
+    ml_temporal_window_init(&w, 10, &g_pool);
     ASSERT_EQ(ml_temporal_window_count(&w), 0u, "count=0");
     ASSERT(ml_temporal_window_ready(&w) == 0, "not ready");
     ml_temporal_window_free(&w);
@@ -151,7 +154,7 @@ static void test_twin_init(void)
 static void test_twin_push(void)
 {
     ml_temporal_window_t w;
-    ml_temporal_window_init(&w, 3);
+    ml_temporal_window_init(&w, 3, &g_pool);
 
     ml_temporal_window_push(&w, 1.0f);
     ASSERT_EQ(ml_temporal_window_count(&w), 1u, "count=1");
@@ -174,7 +177,7 @@ static void test_twin_push(void)
 static void test_twin_stats(void)
 {
     ml_temporal_window_t w;
-    ml_temporal_window_init(&w, 4);
+    ml_temporal_window_init(&w, 4, &g_pool);
 
     ml_temporal_window_push(&w, 1.0f);
     ml_temporal_window_push(&w, 2.0f);
@@ -260,6 +263,8 @@ static void test_rf_reset(void)
 
 void test_domain_algo_suite(void)
 {
+    ml_pool_create(&g_pool, 0);
+
     TEST_SUITE("domain_algo");
 
     RUN_TEST("counter - init",             test_counter_init());
@@ -283,4 +288,6 @@ void test_domain_algo_suite(void)
     RUN_TEST("range_finder - valley",      test_rf_valley());
     RUN_TEST("range_finder - noise rej",   test_rf_noise_reject());
     RUN_TEST("range_finder - reset",       test_rf_reset());
+
+    ml_pool_destroy(&g_pool);
 }

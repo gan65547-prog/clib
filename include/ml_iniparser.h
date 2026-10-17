@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include "ml_dictionary.h"
 
@@ -25,7 +26,7 @@ extern "C" {
 #endif
 
 /* Set a custom error callback. Pass NULL to restore the default (stderr). */
-void ml_ini_set_error_callback(int (*errback)(const char *, ...));
+void ml_ini_set_error_callback(int (*errback)(const char *, va_list));
 
 /* Query: number of sections in the dictionary. */
 int              ml_ini_get_nsec(const ml_dictionary_t *d);
@@ -59,7 +60,7 @@ int              ml_ini_set(ml_dictionary_t *d, const char *entry, const char *v
 void             ml_ini_unset(ml_dictionary_t *d, const char *entry);
 
 /* Load an INI file from disk. Returns NULL on error (syntax or I/O). */
-ml_dictionary_t *ml_ini_load(const char *ininame);
+ml_dictionary_t *ml_ini_load(const char *ininame, ml_pool_t *pool);
 
 /* Free a dictionary loaded by ml_ini_load(). */
 void             ml_ini_free(ml_dictionary_t *d);

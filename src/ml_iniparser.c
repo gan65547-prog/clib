@@ -14,6 +14,7 @@
 #include <ctype.h>
 #include <stdarg.h>
 #include "ml_iniparser.h"
+#include "ml_pool.h"
 
 #define ASCIILINESZ  1024
 #define INI_INVALID_KEY  ((char *)-1)
@@ -39,13 +40,13 @@ static const char *strlwc(const char *in, char *out, unsigned len)
     return out;
 }
 
-static char *xstrdup(const char *s)
+static char *xml_strdup(ml_pool_t *pool, const char *s)
 {
     char *t;
     size_t len;
     if (!s) return NULL;
     len = strlen(s) + 1;
-    t = (char *)malloc(len);
+    t = (char *)pool->f_alloc(pool, len);
     if (t) memcpy(t, s, len);
     return t;
 }
@@ -62,19 +63,14 @@ static unsigned strstrip(char *s)
     return (unsigned)(last - s);
 }
 
-static int default_error_callback(const char *format, ...)
+static int default_error_callback(const char *format, va_list argptr)
 {
-    int ret;
-    va_list argptr;
-    va_start(argptr, format);
-    ret = vfprintf(stderr, format, argptr);
-    va_end(argptr);
-    return ret;
+    return vfprintf(stderr, format, argptr);
 }
 
-static int (*ini_error_callback)(const char *, ...) = NULL;
+static int (*ini_error_callback)(const char *, va_list) = NULL;
 
-void ml_ini_set_error_callback(int (*errback)(const char *, ...))
+void ml_ini_set_error_callback(int (*errback)(const char *, va_list))
 {
     ini_error_callback = errback ? errback : default_error_callback;
 }
@@ -257,13 +253,14 @@ void ml_ini_unset(ml_dictionary_t *d, const char *entry)
 
 /* ---- line parser ---- */
 
-static line_status_t ini_parse_line(const char *input_line, char *section, char *key, char *value)
+static line_status_t ini_parse_line(ml_pool_t *pool, const char *input_line, char *section, char *key, char *value)
 {
     line_status_t sta;
     char *line;
     size_t len;
 
-    line = xstrdup(input_line);
+    line = xml_strdup(pool, input_line);
+    if (!line) return LINE_ERROR;
     len  = strstrip(line);
     sta  = LINE_UNPROCESSED;
 
@@ -296,13 +293,13 @@ static line_status_t ini_parse_line(const char *input_line, char *section, char 
     } else {
         sta = LINE_ERROR;
     }
-    free(line);
+    pool->f_free(pool, line);
     return sta;
 }
 
 /* ---- load / free ---- */
 
-ml_dictionary_t *ml_ini_load(const char *ininame)
+ml_dictionary_t *ml_ini_load(const char *ininame, ml_pool_t *pool)
 {
     FILE *in;
     char line[ASCIILINESZ + 1];
@@ -313,12 +310,13 @@ ml_dictionary_t *ml_ini_load(const char *ininame)
     int last = 0, len, lineno = 0, errs = 0, mem_err = 0;
     ml_dictionary_t *dict;
 
+    if (!ininame || !pool) return NULL;
     in = fopen(ininame, "r");
     if (!in) {
         ini_error("ml_ini: cannot open %s\n", ininame);
         return NULL;
     }
-    dict = ml_dictionary_new(0, NULL);
+    dict = ml_dictionary_new(0, pool);
     if (!dict) { fclose(in); return NULL; }
 
     memset(line, 0, sizeof(line));
@@ -343,7 +341,7 @@ ml_dictionary_t *ml_ini_load(const char *ininame)
         if (line[len] == '\\') { last = len; continue; }
         last = 0;
 
-        switch (ini_parse_line(line, section, key, val)) {
+        switch (ini_parse_line(pool, line, section, key, val)) {
         case LINE_EMPTY:
         case LINE_COMMENT:
             break;

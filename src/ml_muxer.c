@@ -7,6 +7,7 @@
 
 #include "ml_muxer.h"
 #include "ml_pool.h"
+#include "ml_ffmpeg.h"
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
@@ -26,18 +27,12 @@ struct ml_muxer_s {
 
 static void *muxer_alloc(ml_pool_t *pool, size_t size)
 {
-    if (pool)
-        return pool->f_alloc(pool, size);
-    return malloc(size);
+    return pool->f_alloc(pool, size);
 }
 
 static void muxer_free(ml_pool_t *pool, void *p)
 {
-    if (!p) return;
-    if (pool)
-        pool->f_free(pool, p);
-    else
-        free(p);
+    if (p) pool->f_free(pool, p);
 }
 
 /* ── helpers ────────────────────────────────────────────────────────── */
@@ -73,7 +68,7 @@ ml_muxer_create(const char *filename, ml_muxer_format_e fmt, ml_pool_t *pool)
     const AVOutputFormat *ofmt;
     int ret;
 
-    if (!filename) return NULL;
+    if (!filename || !pool) return NULL;
 
     fname = format_name(fmt);
     if (!fname) return NULL;
@@ -127,7 +122,7 @@ ml_muxer_set_video(ml_muxer_t *m, ml_muxer_codec_e codec,
     m->stream->time_base = (AVRational){ fps_den, fps_num };
 
     if (extradata && extradata_len > 0) {
-        par->extradata = av_mallocz(extradata_len + AV_INPUT_BUFFER_PADDING_SIZE);
+        par->extradata = ml_ffmpeg_allocz(extradata_len + AV_INPUT_BUFFER_PADDING_SIZE);
         if (!par->extradata) return -1;
         memcpy(par->extradata, extradata, extradata_len);
         par->extradata_size = extradata_len;
@@ -170,11 +165,11 @@ ml_muxer_write_frame(ml_muxer_t *m, const uint8_t *data, size_t len,
     if (!m || !m->stream || !m->header_written || !data || len == 0)
         return -1;
 
-    pkt = av_packet_alloc();
+    pkt = ml_ffmpeg_packet_alloc();
     if (!pkt) return -1;
 
     if (av_new_packet(pkt, len) < 0) {
-        av_packet_free(&pkt);
+        ml_ffmpeg_packet_free(&pkt);
         return -1;
     }
     memcpy(pkt->data, data, len);
@@ -196,7 +191,7 @@ ml_muxer_write_frame(ml_muxer_t *m, const uint8_t *data, size_t len,
     m->last_dts = pkt->dts;
 
     ret = av_interleaved_write_frame(m->ctx, pkt);
-    av_packet_free(&pkt);
+    ml_ffmpeg_packet_free(&pkt);
 
     return (ret < 0) ? -1 : 0;
 }

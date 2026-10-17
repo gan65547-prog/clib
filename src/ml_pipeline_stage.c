@@ -118,8 +118,9 @@ ml_pipeline_stage_create(const ml_pipeline_stage_cfg_t *cfg)
 
     if (!cfg || !cfg->process || !cfg->pool) return NULL;
 
-    s = calloc(1, sizeof(*s));
+    s = cfg->pool->f_alloc(cfg->pool, sizeof(*s));
     if (!s) return NULL;
+    memset(s, 0, sizeof(*s));
 
     s->process         = cfg->process;
     s->del_input       = cfg->del_input;
@@ -137,7 +138,7 @@ ml_pipeline_stage_create(const ml_pipeline_stage_cfg_t *cfg)
     } else {
         int cap = cfg->max_queue > 0 ? cfg->max_queue : 8;
         s->input_q = ml_queue_create(cap, s->pool);
-        if (!s->input_q) { free(s); return NULL; }
+        if (!s->input_q) { cfg->pool->f_free(cfg->pool, s); return NULL; }
         s->own_input = 1;
     }
 
@@ -149,7 +150,7 @@ ml_pipeline_stage_create(const ml_pipeline_stage_cfg_t *cfg)
         s->output_q = ml_queue_create(cap, s->pool);
         if (!s->output_q) {
             if (s->own_input) ml_queue_destroy(s->input_q);
-            free(s);
+            cfg->pool->f_free(cfg->pool, s);
             return NULL;
         }
         s->own_output = 1;
@@ -178,7 +179,7 @@ ml_pipeline_stage_destroy(ml_pipeline_stage_t *s)
     }
 
     pthread_mutex_destroy(&s->mutex);
-    free(s);
+    s->pool->f_free(s->pool, s);
 }
 
 /* ── control ────────────────────────────────────────────────────────── */

@@ -12,8 +12,8 @@
 #include "../include/ml_pool.h"
 #include "../include/ml_string.h"
 #include "../include/ml_log.h"
-#include "../include/mlfw/mlfw_module.h"
-#include "../include/mlfw/mlfw_message.h"
+#include "../../mlfw/include/mlfw/mlfw_module.h"
+#include "../../mlfw/include/mlfw/mlfw_message.h"
 #include "../../mlfw/plugins/device/ml_plugin_device.h"
 
 /* ---- Stubs ---- */

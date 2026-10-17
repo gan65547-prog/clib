@@ -50,11 +50,13 @@ enum {
 
 /* ── release callback ─────────────────────────────────────────────── */
 
-typedef void (*ml_frame_release_cb)(void *owner, int fd);
+typedef struct ml_frame_s ml_frame_t;
+
+typedef void (*ml_frame_release_cb)(void *owner, ml_frame_t *f);
 
 /* ── frame struct ─────────────────────────────────────────────────── */
 
-typedef struct ml_frame_s {
+struct ml_frame_s {
     /* data planes — up to 3 (packed=1, NV12=2, YUV420p=3) */
     int       fd[3];
     void     *data[3];
@@ -79,7 +81,7 @@ typedef struct ml_frame_s {
     ml_frame_release_cb release;
 
     void *priv;              /* reserved */
-} ml_frame_t;
+};
 
 /* ── pixel-format descriptor table ────────────────────────────────── */
 
@@ -228,16 +230,21 @@ ml_frame_unref(ml_frame_t *f)
     if (__atomic_sub_fetch(&f->refcount, 1, __ATOMIC_RELAXED) > 0) return;
 
     if (f->release) {
-        f->release(f->owner, f->fd[0]);
-        f->fd[0] = -1;  /* release handles fd lifecycle, prevent double-close */
+        f->release(f->owner, f);
     }
 
     if (f->flags & ML_FRAME_FLAG_OWN_FD) {
+        int seen[3] = {-1, -1, -1};
+        int n_seen = 0, j;
         for (i = 0; i < 3; i++) {
-            if (f->fd[i] >= 0) {
+            if (f->fd[i] < 0) continue;
+            for (j = 0; j < n_seen; j++)
+                if (seen[j] == f->fd[i]) break;
+            if (j == n_seen) {
+                seen[n_seen++] = f->fd[i];
                 close(f->fd[i]);
-                f->fd[i] = -1;
             }
+            f->fd[i] = -1;
         }
     }
 }

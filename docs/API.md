@@ -157,7 +157,7 @@ ml_md5(data, len, digest);
 INI 配置文件解析。
 
 ```c
-ml_ini_t *ini = ml_ini_load("/path/to/config.ini");
+ml_ini_t *ini = ml_ini_load("/path/to/config.ini", pool);
 const char *v = ml_ini_get(ini, "section", "key");
 ml_ini_free(ini);
 ```

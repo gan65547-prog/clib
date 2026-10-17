@@ -30,18 +30,20 @@
 #endif
 #include "../src/ml_camera_stub.c"
 
+static ml_pool_t g_pool;
+
 /* ── lifecycle ────────────────────────────────────────────────────────── */
 
 static void test_create_destroy_null(void)
 {
-    ASSERT_PTR_NULL(ml_camera_create(NULL, NULL), "NULL cfg -> NULL");
+    ASSERT_PTR_NULL(ml_camera_create(NULL, &g_pool), "NULL cfg -> NULL");
     ml_camera_destroy(NULL); /* safe on NULL */
 }
 
 static void test_create_stub(void)
 {
     ml_camera_cfg_t cfg = ML_CAMERA_CFG_DEFAULT;
-    ml_camera_t *cam = ml_camera_create(&cfg, NULL);
+    ml_camera_t *cam = ml_camera_create(&cfg, &g_pool);
 
     if (cam) {
         /* stub creates but all ops fail */
@@ -60,7 +62,7 @@ static void test_state_errors(void)
 {
     ml_camera_cfg_t cfg = ML_CAMERA_CFG_DEFAULT;
     ml_frame_t frame;
-    ml_camera_t *cam = ml_camera_create(&cfg, NULL);
+    ml_camera_t *cam = ml_camera_create(&cfg, &g_pool);
 
     if (!cam) return; /* no camera device available */
 
@@ -97,6 +99,8 @@ static void test_cfg_defaults(void)
 
 void test_camera_suite(void)
 {
+    ml_pool_create(&g_pool, 0);
+
     TEST_SUITE("ml_camera — V4L2 / RTSP camera abstraction");
 
     RUN_TEST("create NULL cfg",       { test_create_destroy_null(); });
@@ -104,4 +108,6 @@ void test_camera_suite(void)
     RUN_TEST("state errors",          { test_state_errors(); });
     RUN_TEST("query NULL",            { test_query_null(); });
     RUN_TEST("default config",        { test_cfg_defaults(); });
+
+    ml_pool_destroy(&g_pool);
 }

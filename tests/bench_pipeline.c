@@ -21,6 +21,7 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include "../include/ml_pool.h"
 
 /* Minimal standalone types (no clib dependency for easy porting) */
 typedef long long          bm_int64_t;
@@ -105,12 +106,12 @@ static bm_uint64_t bm_baseline(bm_uint_t iterations, bm_uint_t *lat_ns)
 
     start  = bm_now_ns();
     for (i = 0; i < iterations; i++) {
-        dst = malloc(BM_PAYLOAD_SIZE);
+        dst = ml_alloc(BM_PAYLOAD_SIZE);
         memcpy(dst, src, BM_PAYLOAD_SIZE);
         /* Simulate minimal processing: sum first 8 bytes */
         volatile bm_uint64_t chk = *(bm_uint64_t *)dst;
         (void)chk;
-        free(dst);
+        ml_free(dst);
     }
     end = bm_now_ns();
 
@@ -132,9 +133,9 @@ static void bm_pool_init(bm_pool_t *p, bm_uint_t count)
     bm_uint_t i;
     p->m_pool_size = count;
     p->m_pool_idx  = 0;
-    p->m_pool = malloc(count * sizeof(bm_pkt_t *));
+    p->m_pool = ml_alloc(count * sizeof(bm_pkt_t *));
     for (i = 0; i < count; i++) {
-        p->m_pool[i] = malloc(sizeof(bm_pkt_t));
+        p->m_pool[i] = ml_alloc(sizeof(bm_pkt_t));
         p->m_pool[i]->m_len = BM_PAYLOAD_SIZE;
     }
 }
@@ -146,12 +147,12 @@ static bm_pkt_t *bm_pool_alloc(bm_pool_t *p)
     return p->m_pool[p->m_pool_idx++];
 }
 
-static void bm_pool_free(bm_pool_t *p)
+static void bm_pool_ml_free(bm_pool_t *p)
 {
     bm_uint_t i;
     for (i = 0; i < p->m_pool_size; i++)
-        free(p->m_pool[i]);
-    free(p->m_pool);
+        ml_free(p->m_pool[i]);
+    ml_free(p->m_pool);
 }
 
 /* ---- Producer thread ---- */
@@ -209,7 +210,7 @@ static void *bm_consumer(void *arg)
     bm_uint_t lat_count = 0;
     bm_uint_t max_samples = ctx->m_iterations;
 
-    lat_samples = malloc(max_samples * sizeof(bm_uint64_t));
+    lat_samples = ml_alloc(max_samples * sizeof(bm_uint64_t));
     if (!lat_samples) return NULL;
 
     start = bm_now_ns();
@@ -259,7 +260,7 @@ static void *bm_consumer(void *arg)
         ctx->m_lat_hist[4] = (bm_uint_t)(lat_samples[lat_count - 1]);           /* max */
     }
 
-    free(lat_samples);
+    ml_free(lat_samples);
     return NULL;
 }
 
@@ -341,7 +342,7 @@ int main(int argc, char *argv[])
 
     bm_pool_init(&pool, iterations + ringsz);
 
-    ring_buf = malloc(ringsz * sizeof(void *));
+    ring_buf = ml_alloc(ringsz * sizeof(void *));
     bm_ring_init(&ring, ring_buf, ringsz);
 
     memset(&prod_ctx, 0, sizeof(prod_ctx));
@@ -377,8 +378,8 @@ int main(int argc, char *argv[])
         printf("  Speedup:              %.2fx\n", speedup);
     }
 
-    bm_pool_free(&pool);
-    free(ring_buf);
+    bm_pool_ml_free(&pool);
+    ml_free(ring_buf);
 
     return 0;
 }

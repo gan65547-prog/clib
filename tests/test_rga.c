@@ -20,11 +20,13 @@
 #include "../src/ml_rga_stub.c"
 #endif
 
+static ml_pool_t g_pool;
+
 /* ── lifecycle ────────────────────────────────────────────────────────── */
 
 static void test_create_destroy(void)
 {
-    ml_rga_t *rga = ml_rga_create(NULL);
+    ml_rga_t *rga = ml_rga_create(&g_pool);
     if (rga) {
         ml_rga_destroy(rga);
     }
@@ -45,7 +47,7 @@ static void test_null_checks(void)
 
 static void test_execute_null_op(void)
 {
-    ml_rga_t *rga = ml_rga_create(NULL);
+    ml_rga_t *rga = ml_rga_create(&g_pool);
     if (rga) {
         ASSERT(ml_rga_execute(rga, NULL) < 0, "NULL op fails");
         ml_rga_destroy(rga);
@@ -56,7 +58,7 @@ static void test_execute_null_op(void)
 
 static void test_resize_zero_size(void)
 {
-    ml_rga_t *rga = ml_rga_create(NULL);
+    ml_rga_t *rga = ml_rga_create(&g_pool);
     if (rga) {
         ASSERT(ml_rga_resize(rga, NULL, 0, 0, NULL, 0, 0, 0) < 0,
                "zero-size resize fails");
@@ -68,7 +70,7 @@ static void test_resize_zero_size(void)
 
 static void test_csc_nv12_to_bgr(void)
 {
-    ml_rga_t *rga = ml_rga_create(NULL);
+    ml_rga_t *rga = ml_rga_create(&g_pool);
     if (!rga) return; /* skip if RGA unavailable */
 
     /* allocate test buffers */
@@ -76,8 +78,8 @@ static void test_csc_nv12_to_bgr(void)
     int nv12_size = w * h * 3 / 2;
     int bgr_size  = w * h * 3;
 
-    uint8_t *src = malloc(nv12_size);
-    uint8_t *dst = malloc(bgr_size);
+    uint8_t *src = g_pool.f_alloc(&g_pool, nv12_size);
+    uint8_t *dst = g_pool.f_alloc(&g_pool, bgr_size);
     ASSERT_PTR_NOT_NULL(src, "alloc src");
     ASSERT_PTR_NOT_NULL(dst, "alloc dst");
 
@@ -89,8 +91,8 @@ static void test_csc_nv12_to_bgr(void)
     /* may fail if RGA driver issue, but shouldn't crash */
     (void)ret;
 
-    free(src);
-    free(dst);
+    g_pool.f_free(&g_pool, src);
+    g_pool.f_free(&g_pool, dst);
     ml_rga_destroy(rga);
 }
 
@@ -106,6 +108,8 @@ static void test_available(void)
 
 void test_rga_suite(void)
 {
+    ml_pool_create(&g_pool, 0);
+
     TEST_SUITE("ml_rga — RGA 2D accelerator");
 
     RUN_TEST("create/destroy",      { test_create_destroy(); });
@@ -114,4 +118,6 @@ void test_rga_suite(void)
     RUN_TEST("resize zero size",    { test_resize_zero_size(); });
     RUN_TEST("CSC NV12->BGR",       { test_csc_nv12_to_bgr(); });
     RUN_TEST("available query",     { test_available(); });
+
+    ml_pool_destroy(&g_pool);
 }

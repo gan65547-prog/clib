@@ -4,10 +4,10 @@
  */
 
 #include "ml_cv_math.h"
+#include "ml_pool.h"
 #include <math.h>
 #include <float.h>
 #include <string.h>
-#include <stdlib.h>
 
 /* ── internal helpers ───────────────────────────────────────────────── */
 
@@ -256,11 +256,11 @@ static int nms_score_desc(const void *a, const void *b)
 }
 
 int
-ml_nms_multi_class(ml_nms_box_t *boxes, int count, float iou_threshold)
+ml_nms_multi_class(ml_nms_box_t *boxes, int count, float iou_threshold, ml_pool_t *pool)
 {
     int i, j, keep_count;
 
-    if (!boxes || count <= 1) return count;
+    if (!boxes || count <= 1 || !pool) return count;
 
     /* sort by score descending */
     qsort(boxes, (size_t)count, sizeof(ml_nms_box_t), nms_score_desc);
@@ -270,7 +270,7 @@ ml_nms_multi_class(ml_nms_box_t *boxes, int count, float iou_threshold)
     char *keep;
     int   use_heap = (count > 256);
 
-    keep = use_heap ? (char *)calloc((size_t)count, 1) : stack_buf;
+    keep = use_heap ? (char *)pool->f_alloc(pool, (size_t)count) : stack_buf;
     if (!keep) return count;
     if (!use_heap) memset(stack_buf, 1, (size_t)count);
     else           memset(keep, 1, (size_t)count);
@@ -304,7 +304,7 @@ ml_nms_multi_class(ml_nms_box_t *boxes, int count, float iou_threshold)
         }
     }
 
-    if (use_heap) free(keep);
+    if (use_heap) pool->f_free(pool, keep);
     return keep_count;
 }
 
@@ -318,6 +318,7 @@ ml_letterbox_to_source(float *x, float *y,
     float scale, pad_x, pad_y;
 
     if (!x || !y) return;
+    if (src_w <= 0 || src_h <= 0 || model_w <= 0 || model_h <= 0) return;
 
     scale = (float)model_w / (float)src_w;
     {
@@ -344,7 +345,14 @@ ml_rect_clamp(ml_rect_t r, float img_w, float img_h)
     return r;
 }
 
-/* ── 1D Kalman filter ──────────────────────────────────────────────── */
+/* ── 1D Kalman filter (constant velocity, simplified) ──────────────────
+ *
+ * Simplified Kalman: tracks position (p11) and velocity (p22) covariance
+ * independently.  No cross-covariance term (p12) — valid when position
+ * and velocity errors are uncorrelated or when simplicity is preferred
+ * over optimality.  Sufficient for trajectory smoothing; not for
+ * sensor-fusion applications requiring full error propagation.
+ */
 
 void
 ml_kalman1d_init(ml_kalman1d_t *kf, float process_noise,
@@ -371,11 +379,12 @@ ml_kalman1d_predict(ml_kalman1d_t *kf, float dt)
 void
 ml_kalman1d_update(ml_kalman1d_t *kf, float measurement)
 {
-    float k;
+    float k, innovation;
     if (!kf) return;
     k = kf->p11 / (kf->p11 + kf->r);
-    kf->x = kf->x + k * (measurement - kf->x);
-    kf->v = kf->v + k * (measurement - kf->x);
+    innovation = measurement - kf->x;
+    kf->x = kf->x + k * innovation;
+    kf->v = kf->v + k * innovation;
     kf->p11 = (1.0f - k) * kf->p11;
     kf->p22 = (1.0f - k * 0.5f) * kf->p22;
 }

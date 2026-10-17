@@ -6,7 +6,10 @@
 #include <unistd.h>
 #include "test_framework.h"
 #include "../include/ml_muxer.h"
+#include "../include/ml_pool.h"
 #include "../src/ml_muxer.c"
+
+static ml_pool_t g_pool;
 
 /* Minimal H.264 NAL units for muxing tests.
  * These are synthesized — enough to produce a non-empty output file,
@@ -41,27 +44,27 @@ static int make_extradata(uint8_t *buf, int maxlen)
 
 static void test_create_destroy(void)
 {
-    ml_muxer_t *m = ml_muxer_create("/tmp/test_muxer_create.mp4", ML_MUXER_FMT_MP4, NULL);
+    ml_muxer_t *m = ml_muxer_create("/tmp/test_muxer_create.mp4", ML_MUXER_FMT_MP4, &g_pool);
     ASSERT_PTR_NOT_NULL(m, "create mp4");
     ml_muxer_destroy(m);
 
-    m = ml_muxer_create("/tmp/test_muxer_create.flv", ML_MUXER_FMT_FLV, NULL);
+    m = ml_muxer_create("/tmp/test_muxer_create.flv", ML_MUXER_FMT_FLV, &g_pool);
     ASSERT_PTR_NOT_NULL(m, "create flv");
     ml_muxer_destroy(m);
 
-    m = ml_muxer_create("/tmp/test_muxer_create.mkv", ML_MUXER_FMT_MKV, NULL);
+    m = ml_muxer_create("/tmp/test_muxer_create.mkv", ML_MUXER_FMT_MKV, &g_pool);
     ASSERT_PTR_NOT_NULL(m, "create mkv");
     ml_muxer_destroy(m);
 }
 
 static void test_create_null(void)
 {
-    ASSERT_PTR_NULL(ml_muxer_create(NULL, ML_MUXER_FMT_MP4, NULL), "NULL filename");
+    ASSERT_PTR_NULL(ml_muxer_create(NULL, ML_MUXER_FMT_MP4, &g_pool), "NULL filename");
 }
 
 static void test_create_bad_path(void)
 {
-    ml_muxer_t *m = ml_muxer_create("/no/such/dir/file.mp4", ML_MUXER_FMT_MP4, NULL);
+    ml_muxer_t *m = ml_muxer_create("/no/such/dir/file.mp4", ML_MUXER_FMT_MP4, &g_pool);
     /* create succeeds — failure is at write_header time */
     ASSERT_PTR_NOT_NULL(m, "create works even if path doesn't exist yet");
     /* write_header should fail */
@@ -76,7 +79,7 @@ static void test_create_bad_path(void)
 
 static void test_cant_write_header_twice(void)
 {
-    ml_muxer_t *m = ml_muxer_create("/tmp/test_muxer_hdr2.mp4", ML_MUXER_FMT_MP4, NULL);
+    ml_muxer_t *m = ml_muxer_create("/tmp/test_muxer_hdr2.mp4", ML_MUXER_FMT_MP4, &g_pool);
     ASSERT_PTR_NOT_NULL(m, "create");
 
     ASSERT_EQ(ml_muxer_set_video(m, ML_MUXER_CODEC_H264, 320, 240, 30, 1, NULL, 0),
@@ -88,7 +91,7 @@ static void test_cant_write_header_twice(void)
 
 static void test_cant_set_video_after_header(void)
 {
-    ml_muxer_t *m = ml_muxer_create("/tmp/test_muxer_setafter.mp4", ML_MUXER_FMT_MP4, NULL);
+    ml_muxer_t *m = ml_muxer_create("/tmp/test_muxer_setafter.mp4", ML_MUXER_FMT_MP4, &g_pool);
     ASSERT_PTR_NOT_NULL(m, "create");
 
     ASSERT_EQ(ml_muxer_set_video(m, ML_MUXER_CODEC_H264, 320, 240, 30, 1, NULL, 0),
@@ -101,7 +104,7 @@ static void test_cant_set_video_after_header(void)
 
 static void test_cant_write_without_header(void)
 {
-    ml_muxer_t *m = ml_muxer_create("/tmp/test_muxer_noheader.mp4", ML_MUXER_FMT_MP4, NULL);
+    ml_muxer_t *m = ml_muxer_create("/tmp/test_muxer_noheader.mp4", ML_MUXER_FMT_MP4, &g_pool);
     ASSERT_PTR_NOT_NULL(m, "create");
 
     ASSERT_EQ(ml_muxer_set_video(m, ML_MUXER_CODEC_H264, 320, 240, 30, 1, NULL, 0),
@@ -120,7 +123,7 @@ static void test_null_checks(void)
            "NULL m → write_frame fails");
 
     {
-        ml_muxer_t *m = ml_muxer_create("/tmp/test_muxer_null.mp4", ML_MUXER_FMT_MP4, NULL);
+        ml_muxer_t *m = ml_muxer_create("/tmp/test_muxer_null.mp4", ML_MUXER_FMT_MP4, &g_pool);
         ASSERT_PTR_NOT_NULL(m, "create");
         ASSERT(ml_muxer_write_frame(m, NULL, 10, 0, 0) < 0, "NULL data fails");
         ASSERT(ml_muxer_write_frame(m, h264_idr, 0, 0, 1) < 0, "len=0 fails");
@@ -143,7 +146,7 @@ static void test_muxer_mp4_with_frames(void)
 
     unlink(path);
 
-    m = ml_muxer_create(path, ML_MUXER_FMT_MP4, NULL);
+    m = ml_muxer_create(path, ML_MUXER_FMT_MP4, &g_pool);
     ASSERT_PTR_NOT_NULL(m, "create");
 
     extralen = make_extradata(extradata, sizeof(extradata));
@@ -181,7 +184,7 @@ static void test_muxer_flv_with_frames(void)
 
     unlink(path);
 
-    m = ml_muxer_create(path, ML_MUXER_FMT_FLV, NULL);
+    m = ml_muxer_create(path, ML_MUXER_FMT_FLV, &g_pool);
     ASSERT_PTR_NOT_NULL(m, "create flv");
 
     /* FLV needs extradata */
@@ -216,7 +219,7 @@ static void test_muxer_mkv_with_frames(void)
 
     unlink(path);
 
-    m = ml_muxer_create(path, ML_MUXER_FMT_MKV, NULL);
+    m = ml_muxer_create(path, ML_MUXER_FMT_MKV, &g_pool);
     ASSERT_PTR_NOT_NULL(m, "create mkv");
 
     int extralen = make_extradata(extradata, sizeof(extradata));
@@ -245,6 +248,8 @@ static void test_muxer_mkv_with_frames(void)
 
 void test_muxer_suite(void)
 {
+    ml_pool_create(&g_pool, 0);
+
     TEST_SUITE("ml_muxer — FFmpeg video muxer");
 
     RUN_TEST("create/destroy all formats",  { test_create_destroy(); });
@@ -257,4 +262,6 @@ void test_muxer_suite(void)
     RUN_TEST("mux MP4 10 frames",           { test_muxer_mp4_with_frames(); });
     RUN_TEST("mux FLV 5 frames",            { test_muxer_flv_with_frames(); });
     RUN_TEST("mux MKV 10 frames",           { test_muxer_mkv_with_frames(); });
+
+    ml_pool_destroy(&g_pool);
 }

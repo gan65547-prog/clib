@@ -37,7 +37,7 @@ typedef struct ml_dictionary_s {
 unsigned         ml_dictionary_hash(const char *key);
 
 /* Create a new dictionary. Minimum size is 128 entries.
- * pool: optional memory pool (NULL → malloc/free). */
+ * pool: required (must not be NULL). */
 ml_dictionary_t *ml_dictionary_new(size_t size, ml_pool_t *pool);
 
 /* Delete a dictionary, freeing all keys, values, and internal arrays. */

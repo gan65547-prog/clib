@@ -5,7 +5,10 @@
 #include <strings.h>
 #include "test_framework.h"
 #include "../include/ml_types.h"
-#include "../include/mlfw/mlfw_http.h"
+#include "../include/ml_pool.h"
+#include "../../mlfw/include/mlfw/mlfw_http.h"
+
+static ml_pool_t g_pool;
 /* Source symbols come from test_http_parser.o which includes ml_http.c */
 
 /* ---- Request parsing ---- */
@@ -18,7 +21,7 @@ static void test_parse_get_simple(void)
         "\r\n";
 
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
 
     ml_int_t n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
@@ -39,7 +42,7 @@ static void test_parse_post_with_body(void)
         "{\"name\":\"test\"}";
 
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
 
     ml_int_t n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
@@ -68,7 +71,7 @@ static void test_parse_all_methods(void)
 
     for (i = 0; i < 4; i++) {
         ml_http_request_t req;
-        ml_http_request_init(&req);
+        ml_http_request_init(&req, &g_pool);
         ml_int_t n = ml_http_parse(&req, tests[i], strlen(tests[i]));
         ASSERT(n > 0, "parse should succeed");
         ASSERT(req.m_method == expected[i], "method should match");
@@ -86,7 +89,7 @@ static void test_parse_multiple_headers(void)
         "\r\n";
 
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
     ml_int_t n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
     ASSERT_EQ(req.m_header_count, 3, "should have 3 headers");
@@ -97,7 +100,7 @@ static void test_parse_incomplete_request(void)
 {
     const char *raw = "GET /api";
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
     ml_int_t n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT_EQ(n, 0, "incomplete should return 0 (need more data)");
     ml_http_request_free(&req);
@@ -106,7 +109,7 @@ static void test_parse_incomplete_request(void)
 static void test_parse_null_rejects(void)
 {
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
     ASSERT(ml_http_parse(NULL, "GET / HTTP/1.1\r\n\r\n", 18) < 0,
            "NULL request should fail");
     ASSERT(ml_http_parse(&req, NULL, 10) < 0, "NULL data should fail");
@@ -125,7 +128,7 @@ static void test_header_get_exact(void)
         "\r\n";
 
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
     ml_int_t n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
 
@@ -150,7 +153,7 @@ static void test_header_get_case_insensitive(void)
         "\r\n";
 
     ml_http_request_t req;
-    ml_http_request_init(&req);
+    ml_http_request_init(&req, &g_pool);
     ml_int_t n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
 
@@ -168,7 +171,7 @@ static void test_header_get_null_checks(void)
     ASSERT_PTR_NULL(ml_http_header_get(NULL, "X"), "NULL req → NULL");
     {
         ml_http_request_t req;
-        ml_http_request_init(&req);
+        ml_http_request_init(&req, &g_pool);
         ASSERT_PTR_NULL(ml_http_header_get(&req, NULL), "NULL name → NULL");
         ml_http_request_free(&req);
     }
@@ -268,6 +271,8 @@ static void test_error_response(void)
 
 void test_http_suite(void)
 {
+    ml_pool_create(&g_pool, 0);
+
     TEST_SUITE("HTTP Parser & Response");
 
     RUN_TEST("parse GET simple", { test_parse_get_simple(); });
@@ -289,4 +294,6 @@ void test_http_suite(void)
 
     RUN_TEST("json response convenience", { test_json_response(); });
     RUN_TEST("error response convenience", { test_error_response(); });
+
+    ml_pool_destroy(&g_pool);
 }

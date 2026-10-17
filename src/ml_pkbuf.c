@@ -14,13 +14,9 @@ ml_pkbuf_t * ml_pkbuf_alloc(ml_int_t size, ml_pool_t *pool)
 {
     ml_pkbuf_t * pkb;
 
-    if (size <= 0) return NULL;
+    if (size <= 0 || !pool) return NULL;
 
-    if (pool) {
-        pkb = (ml_pkbuf_t *)pool->f_alloc(pool, sizeof(ml_pkbuf_t) + (size_t)size);
-    } else {
-        pkb = (ml_pkbuf_t *)ml_alloc(sizeof(ml_pkbuf_t) + (size_t)size);
-    }
+    pkb = (ml_pkbuf_t *)pool->f_alloc(pool, sizeof(ml_pkbuf_t) + (size_t)size);
 
     if (pkb) {
         pkb->f_handler   = NULL;
@@ -46,9 +42,6 @@ ml_pkbuf_t * ml_pkbuf_alloc(ml_int_t size, ml_pool_t *pool)
 
 void ml_pkbuf_free(ml_pkbuf_t *pkb)
 {
-    if (!pkb) return;
-    if (pkb->m_pool)
-        pkb->m_pool->f_free(pkb->m_pool, pkb);
-    else
-        ml_free(pkb);
+    if (!pkb || !pkb->m_pool) return;
+    pkb->m_pool->f_free(pkb->m_pool, pkb);
 }

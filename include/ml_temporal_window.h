@@ -17,14 +17,17 @@
 extern "C" {
 #endif
 
+typedef struct ml_pool_s ml_pool_t;
+
 typedef struct {
-    float   *buf;
-    uint32_t capacity;
-    uint32_t count;
-    uint32_t write_pos;
+    float      *buf;
+    uint32_t    capacity;
+    uint32_t    count;
+    uint32_t    write_pos;
+    ml_pool_t  *pool;
 } ml_temporal_window_t;
 
-void ml_temporal_window_init(ml_temporal_window_t *w, uint32_t capacity);
+void ml_temporal_window_init(ml_temporal_window_t *w, uint32_t capacity, ml_pool_t *pool);
 void ml_temporal_window_push(ml_temporal_window_t *w, float value);
 void ml_temporal_window_free(ml_temporal_window_t *w);
 

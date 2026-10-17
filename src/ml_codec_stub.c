@@ -26,8 +26,10 @@ struct ml_codec_s {
 ml_codec_t *
 ml_codec_create(const ml_codec_cfg_t *cfg, ml_pool_t *pool)
 {
-    ml_codec_t *c = calloc(1, sizeof(*c));
+    if (!pool) return NULL;
+    ml_codec_t *c = pool->f_alloc(pool, sizeof(*c));
     if (!c) return NULL;
+    memset(c, 0, sizeof(*c));
 
     if (cfg)
         c->cfg = *cfg;
@@ -43,7 +45,7 @@ ml_codec_create(const ml_codec_cfg_t *cfg, ml_pool_t *pool)
 void
 ml_codec_destroy(ml_codec_t *c)
 {
-    free(c);
+    if (c && c->pool) c->pool->f_free(c->pool, c);
 }
 
 /* ── encoding (all fail) ──────────────────────────────────────────────── */

@@ -17,6 +17,9 @@
 
 #include "ml_types.h"
 
+/* ── forward decl ───────────────────────────────────────────────────── */
+typedef struct ml_pool_s ml_pool_t;
+
 /* ── constants ─────────────────────────────────────────────────────── */
 
 #define ML_HTTP_METHOD_LEN      8
@@ -67,7 +70,8 @@ typedef struct {
     size_t            m_offset;
     size_t            m_body_start;
     size_t            m_buf_size;
-    char             *m_buf;         /* heap-allocated parser buffer */
+    char             *m_buf;         /* pool-allocated parser buffer */
+    ml_pool_t        *m_pool;
 } ml_http_request_t;
 
 typedef struct {
@@ -90,7 +94,7 @@ typedef struct {
 
 /* ── request parsing ────────────────────────────────────────────────── */
 
-void ml_http_request_init(ml_http_request_t *r);
+int ml_http_request_init(ml_http_request_t *r, ml_pool_t *pool);
 
 /* Free internal buffers. Must be called after ml_http_request_init. */
 void ml_http_request_free(ml_http_request_t *r);

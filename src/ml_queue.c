@@ -50,13 +50,9 @@ ml_queue_create(int capacity, ml_pool_t *pool)
     ml_queue_t *q;
     size_t ring_bytes;
 
-    if (capacity < 1) return NULL;
+    if (capacity < 1 || !pool) return NULL;
 
-    if (pool) {
-        q = pool->f_alloc(pool, sizeof(*q));
-    } else {
-        q = malloc(sizeof(*q));
-    }
+    q = pool->f_alloc(pool, sizeof(*q));
     if (!q) return NULL;
     memset(q, 0, sizeof(*q));
 
@@ -64,14 +60,9 @@ ml_queue_create(int capacity, ml_pool_t *pool)
     q->pool     = pool;
 
     ring_bytes = (size_t)capacity * sizeof(void *);
-    if (pool) {
-        q->ring = pool->f_alloc(pool, ring_bytes);
-    } else {
-        q->ring = malloc(ring_bytes);
-    }
+    q->ring = pool->f_alloc(pool, ring_bytes);
     if (!q->ring) {
-        if (pool) pool->f_free(pool, q);
-        else free(q);
+        pool->f_free(pool, q);
         return NULL;
     }
     memset(q->ring, 0, ring_bytes);
@@ -92,16 +83,9 @@ ml_queue_destroy(ml_queue_t *q)
     pthread_cond_destroy(&q->not_empty);
     pthread_mutex_destroy(&q->mutex);
 
-    if (q->ring) {
-        if (q->pool)
-            q->pool->f_free(q->pool, q->ring);
-        else
-            free(q->ring);
-    }
-    if (q->pool)
-        q->pool->f_free(q->pool, q);
-    else
-        free(q);
+    if (q->ring)
+        q->pool->f_free(q->pool, q->ring);
+    q->pool->f_free(q->pool, q);
 }
 
 /* ── push ────────────────────────────────────────────────────────── */
