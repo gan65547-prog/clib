@@ -37,6 +37,17 @@
 #define IP4_ADDR_LENGTH                        ML_IP4_ADDR_LENGTH
 #define IP6_ADDR_LENGTH                        ML_IP6_ADDR_LENGTH
 
+/* Forward declarations for cycle config */
+typedef struct ml_pool_s    ml_pool_t;
+typedef struct ml_log_s     ml_log_t;
+
+typedef struct {
+    ml_pool_t      *m_pool;
+    ml_log_t       *m_log;
+    char           *m_path;
+    void           *m_obj;
+} ml_cycle_config_t;
+
 /* General-purpose macros */
 #define ML_TRUE                                1
 #define ML_FALSE                               0
