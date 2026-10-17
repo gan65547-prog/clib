@@ -35,22 +35,22 @@ extern char * ml_strchr(const char *s, int c);
 /* Find last occurrence of character c in string s */
 extern char * ml_strrchr(const char *s, int c);
 /* Convert string to lowercase */
-extern void ml_strlow(char *dst, char *src, int n);
+extern void ml_strlow(char *dst, const char *src, int n);
 /* Return string length, clamped to n */
-extern int ml_strnlen(char *p, int n);
+extern int ml_strnlen(const char *p, int n);
 /* Copy n bytes of string, guaranteed null-terminated */
-extern char * ml_cpystrn(char *dst, char *src, int n);
+extern char * ml_cpystrn(char *dst, const char *src, int n);
 /* Search for s2 within s1 (len = length of s1) */
-extern char * ml_strnstr(char *s1, char *s2, int len);
+extern char * ml_strnstr(const char *s1, const char *s2, int len);
 /* Safe copy, stops at character c. dstlen = destination buffer size */
-extern char * ml_cpystrc(char *dst, char *src, int dstlen, int srclen, unsigned char c);
+extern char * ml_cpystrc(char *dst, const char *src, int dstlen, int srclen, unsigned char c);
 /* Safe copy, stops at character c */
-extern char * ml_cpystrc2(char *dst, char *src, int dstlen, unsigned char c);
+extern char * ml_cpystrc2(char *dst, const char *src, int dstlen, unsigned char c);
 /* Safe copy, stops when the string ctx is found */
-extern char * ml_cpystrs(char * dst, char * src, int dstlen, char * ctx);
+extern char * ml_cpystrs(char * dst, const char * src, int dstlen, const char * ctx);
 /* Copy from the last occurrence of character c */
-extern char * ml_cpystrrc(char *dst, char *src, int dstlen, unsigned char c);
+extern char * ml_cpystrrc(char *dst, const char *src, int dstlen, unsigned char c);
 /* Replace all occurrences of 'find' with 'replace' in src, write to out */
-extern int ml_strresp(char * src, char * find, char * replace, char * out, int slen, int olen);
+extern int ml_strresp(const char * src, const char * find, const char * replace, char * out, int slen, int olen);
 
 #endif

@@ -47,6 +47,7 @@ void ml_log_write(ml_log_t * log, ml_uint_t size)
     int ret = 0;
 
     if (log->m_fd > 0) {
+        ml_thread_mutex_lock(&log->m_mutex);
 
         if ( log->m_store >= log->m_length ) {
             ml_log_lseek(log);
@@ -55,6 +56,8 @@ void ml_log_write(ml_log_t * log, ml_uint_t size)
 
         if (( ret = write(log->m_fd, log->m_buff, size) ) > 0 )
             log->m_store += ret;
+
+        ml_thread_mutex_unlock(&log->m_mutex);
     }
 
 }
@@ -115,6 +118,8 @@ void ml_log_create(ml_log_t * log, const char * path, ml_uint_t deflv, ml_uint_t
 
     if (fd > 0)
         lseek(fd, 0, SEEK_END);
+
+    ml_thread_mutex_create(&log->m_mutex);
 }
 
 
@@ -123,6 +128,7 @@ void ml_log_destroy(ml_log_t * log)
 {
     if (log->m_fd)
         close(log->m_fd);
+    ml_thread_mutex_destroy(&log->m_mutex);
 }
 
 

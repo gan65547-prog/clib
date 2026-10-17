@@ -59,7 +59,7 @@ static void *ml_thread_pool_worker(void *arg)
         ml_thread_mutex_unlock(&tp->m_mutex);
 
         task->f_func(task->m_arg);
-        ml_free(task);
+        tp->m_pool->f_free(tp->m_pool, task);
 
         ml_thread_mutex_lock(&tp->m_mutex);
         tp->m_active--;
@@ -99,7 +99,7 @@ ml_thread_pool_t *ml_thread_pool_create(ml_pool_t *pool, ml_int_t nthreads,
     tp->m_max_queue   = max_queue;
     tp->m_pool        = pool;
 
-    if (ml_thread_mutex_create(&tp->m_mutex) != ML_OK)   return NULL;
+    if (ml_thread_mutex_create(&tp->m_mutex) != ML_OK)   goto fail_threads;
     if (ml_thread_cond_create(&tp->m_cond) != ML_OK)     goto fail_mutex;
     if (ml_thread_cond_create(&tp->m_idle_cond) != ML_OK) goto fail_cond;
 
@@ -127,6 +127,9 @@ fail_cond:
     ml_thread_cond_destroy(&tp->m_cond);
 fail_mutex:
     ml_thread_mutex_destroy(&tp->m_mutex);
+fail_threads:
+    pool->f_free(pool, tp->m_threads);
+    pool->f_free(pool, tp);
     return NULL;
 }
 
@@ -151,7 +154,7 @@ void ml_thread_pool_destroy(ml_thread_pool_t *tp)
     while (tp->m_queue_head) {
         ml_thread_task_t *t = tp->m_queue_head;
         tp->m_queue_head = t->m_next;
-        ml_free(t);
+        tp->m_pool->f_free(tp->m_pool, t);
     }
 
     ml_thread_cond_destroy(&tp->m_idle_cond);
@@ -177,7 +180,7 @@ ml_int_t ml_thread_pool_submit(ml_thread_pool_t *tp, void (*func)(void *), void 
         return ML_ERROR;
     }
 
-    task = ml_alloc(sizeof(ml_thread_task_t));
+    task = tp->m_pool->f_alloc(tp->m_pool, sizeof(ml_thread_task_t));
     if (task == NULL) {
         ml_thread_mutex_unlock(&tp->m_mutex);
         return ML_ERROR;

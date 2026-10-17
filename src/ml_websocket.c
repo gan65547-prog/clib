@@ -14,13 +14,15 @@
 #include <time.h>
 
 #include <openssl/sha.h>
+#include <openssl/rand.h>
 
 /* ── frame parsing ──────────────────────────────────────────────────── */
 
 int
 ml_ws_parse_frame(const char *data, int len, ml_ws_frame_t *frame)
 {
-    int hdr_len, payload_len, consumed;
+    int hdr_len, consumed;
+    uint64_t payload_len;
     const unsigned char *p;
     uint8_t b0, b1;
 
@@ -41,15 +43,14 @@ ml_ws_parse_frame(const char *data, int len, ml_ws_frame_t *frame)
 
     if (payload_len == 126) {
         if (len < 4) return 0;
-        payload_len = ((int)p[2] << 8) | p[3];
+        payload_len = ((uint64_t)p[2] << 8) | p[3];
         hdr_len = 4;
     } else if (payload_len == 127) {
         if (len < 10) return 0;
-        /* only support up to 31-bit payload (2 GiB) */
-        payload_len = (int)(((uint64_t)p[2] << 56) | ((uint64_t)p[3] << 48) |
-                            ((uint64_t)p[4] << 40) | ((uint64_t)p[5] << 32) |
-                            ((uint64_t)p[6] << 24) | ((uint64_t)p[7] << 16) |
-                            ((uint64_t)p[8] << 8)  | (uint64_t)p[9]);
+        payload_len = ((uint64_t)p[2] << 56) | ((uint64_t)p[3] << 48) |
+                      ((uint64_t)p[4] << 40) | ((uint64_t)p[5] << 32) |
+                      ((uint64_t)p[6] << 24) | ((uint64_t)p[7] << 16) |
+                      ((uint64_t)p[8] << 8)  | (uint64_t)p[9];
         hdr_len = 10;
     }
 
@@ -65,11 +66,11 @@ ml_ws_parse_frame(const char *data, int len, ml_ws_frame_t *frame)
     if (payload_len > ML_WS_MAX_FRAME_SIZE)
         return -1;
 
-    consumed = hdr_len + payload_len;
+    consumed = hdr_len + (int)payload_len;
     if (len < consumed) return 0;
 
     frame->payload     = (char *)data + hdr_len;
-    frame->payload_len = payload_len;
+    frame->payload_len = (int)payload_len;
 
     if (frame->masked)
         ml_ws_mask(frame->payload, payload_len, frame->mask);
@@ -192,14 +193,17 @@ void
 ml_ws_generate_key(char *key_out)
 {
     unsigned char random_bytes[16];
-    int i;
-    struct timespec ts;
 
-    clock_gettime(CLOCK_REALTIME, &ts);
-    unsigned int seed = (unsigned int)(ts.tv_nsec ^ ts.tv_sec ^ (long)&key_out);
-    for (i = 0; i < 16; i++) {
-        seed = seed * 1103515245u + 12345u;
-        random_bytes[i] = (unsigned char)((seed >> 16) & 0xFF);
+    if (RAND_bytes(random_bytes, sizeof(random_bytes)) != 1) {
+        /* fallback: LCG seeded from clock + stack */
+        int i;
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        unsigned int seed = (unsigned int)(ts.tv_nsec ^ ts.tv_sec ^ (uintptr_t)&key_out);
+        for (i = 0; i < 16; i++) {
+            seed = seed * 1103515245u + 12345u;
+            random_bytes[i] = (unsigned char)((seed >> 16) & 0xFF);
+        }
     }
 
     ml_base64_encode(random_bytes, 16, key_out, 25);

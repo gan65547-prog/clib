@@ -23,9 +23,9 @@
 
 
 
-ml_int_t  ml_mmap_connect(ml_mmap_t *mm, char * path, ml_int_t length)
+int  ml_mmap_connect(ml_mmap_t *mm, char * path, size_t length)
 {
-    if (!mm || !path || length <= 0)
+    if (!mm || !path || length == 0)
         return ML_EPARAM;
 
     mm->m_path = path;
@@ -52,9 +52,9 @@ ml_int_t  ml_mmap_connect(ml_mmap_t *mm, char * path, ml_int_t length)
 
 
 
-ml_int_t  ml_mmap_create(ml_mmap_t *mm, char * path, ml_int_t length)
+int  ml_mmap_create(ml_mmap_t *mm, char * path, size_t length)
 {
-    if (!mm || !path || length <= 0)
+    if (!mm || !path || length == 0)
         return ML_EPARAM;
 
     mm->m_path = path;
@@ -88,6 +88,7 @@ ml_int_t  ml_mmap_create(ml_mmap_t *mm, char * path, ml_int_t length)
 
 void ml_mmap_destroy(ml_mmap_t *mm)
 {
+    if (!mm) return;
     if (mm->m_addr && mm->m_addr != MAP_FAILED)
         munmap(mm->m_addr, mm->m_size);
     if (mm->m_fd >= 0)

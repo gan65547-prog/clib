@@ -33,7 +33,7 @@ enum {
 };
 
 /* Convert an error code to a human-readable string. */
-static inline char *  ml_code_string(ml_int_t code)
+static inline const char *  ml_code_string(ml_int_t code)
 {
     switch (code) {
         case ML_OK:                    { return "success"; } break;

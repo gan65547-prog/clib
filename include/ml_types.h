@@ -30,7 +30,7 @@ typedef ml_int64_t                   ml_atomic_int_t;
 typedef ml_uint64_t                  ml_atomic_uint_t;
 typedef volatile ml_uint64_t         ml_atomic_t;
 
-typedef _Atomic unsigned long         ml_uatomic_t;
+typedef _Atomic unsigned char          ml_uatomic_t;
 
 #ifndef container_of
 #define container_of(ptr, type, member) ({                    \

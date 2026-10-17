@@ -9,6 +9,7 @@
 #define __ML_LOG_H__
 
 #include "ml_types.h"
+#include "ml_thread.h"
 
 /* Log severity levels */
 enum {
@@ -20,14 +21,15 @@ enum {
 };
 
 typedef struct ml_log_s {
-    ml_int_t          m_fd;
-    ml_uint_t         m_level;
-    ml_uint_t         m_length;
-    ml_uint_t         m_total;
-    ml_uint_t         m_store;
-    ml_uint_t         m_size;
-    char   *           m_buff;
-    char               m_date[64];
+    ml_int_t            m_fd;
+    ml_uint_t           m_level;
+    ml_uint_t           m_length;
+    ml_uint_t           m_total;
+    ml_uint_t           m_store;
+    ml_uint_t           m_size;
+    char               *m_buff;
+    char                m_date[64];
+    ml_thread_mutex_t   m_mutex;
 } ml_log_t;
 
 /* Create a log backed by the file at path, with minimum severity deflv.

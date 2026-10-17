@@ -321,16 +321,30 @@ ml_http_error_response(int status, const char *msg,
     int i, j;
 
     for (i = 0, j = 0; msg && msg[i] && j < (int)sizeof(safe_msg) - 2; i++) {
-        if (msg[i] == '"' || msg[i] == '\\') {
+        unsigned char c = (unsigned char)msg[i];
+        if (c == '"' || c == '\\') {
             if (j + 2 >= (int)sizeof(safe_msg)) break;
             safe_msg[j++] = '\\';
             safe_msg[j++] = msg[i];
-        } else if (msg[i] == '\n') {
+        } else if (c == '\n') {
             if (j + 2 >= (int)sizeof(safe_msg)) break;
             safe_msg[j++] = '\\';
             safe_msg[j++] = 'n';
-        } else if (msg[i] == '\r') {
+        } else if (c == '\t') {
+            if (j + 2 >= (int)sizeof(safe_msg)) break;
+            safe_msg[j++] = '\\';
+            safe_msg[j++] = 't';
+        } else if (c == '\r') {
             continue;
+        } else if (c < 0x20) {
+            /* JSON escape other control chars as \\u00XX */
+            if (j + 6 >= (int)sizeof(safe_msg)) break;
+            safe_msg[j++] = '\\';
+            safe_msg[j++] = 'u';
+            safe_msg[j++] = '0';
+            safe_msg[j++] = '0';
+            safe_msg[j++] = "0123456789abcdef"[c >> 4];
+            safe_msg[j++] = "0123456789abcdef"[c & 0x0F];
         } else {
             safe_msg[j++] = msg[i];
         }

@@ -182,9 +182,12 @@ ml_mux_write_frame(ml_mux_t *m, const uint8_t *data, int len,
     if (keyframe)
         pkt->flags |= AV_PKT_FLAG_KEY;
 
-    /* ensure monotonically increasing dts */
-    if (pkt->dts <= m->last_dts)
+    /* ensure monotonically increasing dts; keep pts in sync */
+    if (pkt->dts <= m->last_dts) {
+        int64_t delta = m->last_dts + 1 - pkt->dts;
         pkt->dts = m->last_dts + 1;
+        pkt->pts += delta;
+    }
     m->last_dts = pkt->dts;
 
     ret = av_interleaved_write_frame(m->ctx, pkt);

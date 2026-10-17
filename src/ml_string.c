@@ -23,7 +23,7 @@ char * ml_strchr(const char *s, int c)
 
 
 
-void ml_strlow(char *dst, char *src, int n)
+void ml_strlow(char *dst, const char *src, int n)
 {
     while (n) {
         *dst = ml_tolower(*src);
@@ -34,7 +34,7 @@ void ml_strlow(char *dst, char *src, int n)
 }
 
 
-int ml_strnlen(char *p, int n)
+int ml_strnlen(const char *p, int n)
 {
     int  i;
 
@@ -64,7 +64,7 @@ char * ml_strrchr(const char *s, int c)
 
 
 
-char * ml_strnstr(char *s1, char *s2, int len)
+char * ml_strnstr(const char *s1, const char *s2, int len)
 {
     int l2;
 
@@ -83,7 +83,7 @@ char * ml_strnstr(char *s1, char *s2, int len)
 
 
 
-char * ml_cpystrn(char *dst, char *src, int n)
+char * ml_cpystrn(char *dst, const char *src, int n)
 {
     if (n == 0) {
         return dst;
@@ -107,7 +107,7 @@ char * ml_cpystrn(char *dst, char *src, int n)
 
 
 
-char * ml_cpystrrc(char *dst, char *src, int dstlen, unsigned char c)
+char * ml_cpystrrc(char *dst, const char *src, int dstlen, unsigned char c)
 {
     char * p1;
     int l, l1, l2;
@@ -129,7 +129,7 @@ char * ml_cpystrrc(char *dst, char *src, int dstlen, unsigned char c)
 
 
 
-char * ml_cpystrc2(char *dst, char *src, int dstlen, unsigned char c)
+char * ml_cpystrc2(char *dst, const char *src, int dstlen, unsigned char c)
 {
     int n;
     char * tmp = dst;
@@ -169,7 +169,7 @@ char * ml_cpystrc2(char *dst, char *src, int dstlen, unsigned char c)
 
 
 
-char * ml_cpystrc(char *dst, char *src, int dstlen, int srclen, unsigned char c)
+char * ml_cpystrc(char *dst, const char *src, int dstlen, int srclen, unsigned char c)
 {
     int n = srclen;
 
@@ -206,7 +206,7 @@ char * ml_cpystrc(char *dst, char *src, int dstlen, int srclen, unsigned char c)
 
 
 
-char * ml_cpystrs(char * dst, char * src, int dstlen, char * ctx)
+char * ml_cpystrs(char * dst, const char * src, int dstlen, const char * ctx)
 {
     char * p1;
     int l1, l2, l;
@@ -225,7 +225,7 @@ char * ml_cpystrs(char * dst, char * src, int dstlen, char * ctx)
 
 
 
-int ml_strresp(char * input, char * ctx, char * rpl, char * output, int inlen, int outlen)
+int ml_strresp(const char * input, const char * ctx, const char * rpl, char * output, int inlen, int outlen)
 {
     char * p, *tmp, *dst;
     int left = 0, len = 0;

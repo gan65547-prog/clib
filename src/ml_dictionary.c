@@ -28,28 +28,52 @@ static char *dict_strdup(const char *s)
 
 static int dictionary_grow(ml_dictionary_t *d)
 {
-    char     **new_val, **new_key;
-    unsigned  *new_hash;
+    char     **old_key, **old_val;
+    unsigned  *old_hash;
+    ssize_t    old_size, i;
 
-    new_val  = (char **)calloc(d->size * 2, sizeof(*d->val));
-    new_key  = (char **)calloc(d->size * 2, sizeof(*d->key));
-    new_hash = (unsigned *)calloc(d->size * 2, sizeof(*d->hash));
-    if (!new_val || !new_key || !new_hash) {
-        free(new_val);
-        free(new_key);
-        free(new_hash);
+    old_size = d->size;
+    old_key  = d->key;
+    old_val  = d->val;
+    old_hash = d->hash;
+
+    d->size *= 2;
+    d->val  = (char **)calloc(d->size, sizeof(*d->val));
+    d->key  = (char **)calloc(d->size, sizeof(*d->key));
+    d->hash = (unsigned *)calloc(d->size, sizeof(*d->hash));
+    d->n    = 0;
+
+    if (!d->val || !d->key || !d->hash) {
+        free(d->val);
+        free(d->key);
+        free(d->hash);
+        d->val  = old_val;
+        d->key  = old_key;
+        d->hash = old_hash;
+        d->size = old_size;
         return -1;
     }
-    memcpy(new_val,  d->val,  d->size * sizeof(char *));
-    memcpy(new_key,  d->key,  d->size * sizeof(char *));
-    memcpy(new_hash, d->hash, d->size * sizeof(unsigned));
-    free(d->val);
-    free(d->key);
-    free(d->hash);
-    d->size *= 2;
-    d->val  = new_val;
-    d->key  = new_key;
-    d->hash = new_hash;
+
+    /* Re-insert entries at their new hash positions */
+    for (i = 0; i < old_size; i++) {
+        if (old_key[i]) {
+            ssize_t j, start = (ssize_t)(old_hash[i] % (unsigned)d->size);
+            for (j = 0; j < d->size; j++) {
+                ssize_t idx = (start + j) % d->size;
+                if (!d->key[idx]) {
+                    d->key[idx]  = old_key[i];
+                    d->val[idx]  = old_val[i];
+                    d->hash[idx] = old_hash[i];
+                    d->n++;
+                    break;
+                }
+            }
+        }
+    }
+
+    free(old_key);
+    free(old_val);
+    free(old_hash);
     return 0;
 }
 
@@ -106,68 +130,80 @@ void ml_dictionary_delete(ml_dictionary_t *d)
 const char *ml_dictionary_get(const ml_dictionary_t *d, const char *key, const char *def)
 {
     unsigned  hash;
-    ssize_t   i;
+    ssize_t   i, start;
 
-    if (!d) return def;
-    hash = ml_dictionary_hash(key);
+    if (!d || !key || d->size == 0) return def;
+    hash  = ml_dictionary_hash(key);
+    start = (ssize_t)(hash % (unsigned)d->size);
     for (i = 0; i < d->size; i++) {
-        if (!d->key[i]) continue;
-        if (hash == d->hash[i] && !strcmp(key, d->key[i]))
-            return d->val[i];
+        ssize_t idx = (start + i) % d->size;
+        if (!d->key[idx]) continue;
+        if (hash == d->hash[idx] && !strcmp(key, d->key[idx]))
+            return d->val[idx];
     }
     return def;
 }
 
 int ml_dictionary_set(ml_dictionary_t *d, const char *key, const char *val)
 {
-    ssize_t   i;
-    unsigned  hash;
+    ssize_t    i, start;
+    unsigned   hash;
 
-    if (!d || !key) return -1;
-    hash = ml_dictionary_hash(key);
+    if (!d || !key || d->size == 0) return -1;
+    hash  = ml_dictionary_hash(key);
+    start = (ssize_t)(hash % (unsigned)d->size);
 
+    /* Check if key already exists */
     if (d->n > 0) {
         for (i = 0; i < d->size; i++) {
-            if (!d->key[i]) continue;
-            if (hash == d->hash[i] && !strcmp(key, d->key[i])) {
-                free(d->val[i]);
-                d->val[i] = val ? dict_strdup(val) : NULL;
+            ssize_t idx = (start + i) % d->size;
+            if (!d->key[idx]) continue;
+            if (hash == d->hash[idx] && !strcmp(key, d->key[idx])) {
+                free(d->val[idx]);
+                d->val[idx] = val ? dict_strdup(val) : NULL;
                 return 0;
             }
         }
     }
-    if (d->n == d->size) {
+    if (d->n >= d->size / 2) {
         if (dictionary_grow(d) != 0) return -1;
+        start = (ssize_t)(hash % (unsigned)d->size);
     }
-    for (i = d->n; d->key[i]; ) {
-        if (++i == d->size) i = 0;
+    /* Find empty slot via linear probing */
+    for (i = 0; i < d->size; i++) {
+        ssize_t idx = (start + i) % d->size;
+        if (!d->key[idx]) {
+            d->key[idx]  = dict_strdup(key);
+            d->val[idx]  = val ? dict_strdup(val) : NULL;
+            d->hash[idx] = hash;
+            d->n++;
+            return 0;
+        }
     }
-    d->key[i]  = dict_strdup(key);
-    d->val[i]  = val ? dict_strdup(val) : NULL;
-    d->hash[i] = hash;
-    d->n++;
-    return 0;
+    return -1;
 }
 
 void ml_dictionary_unset(ml_dictionary_t *d, const char *key)
 {
     unsigned  hash;
-    ssize_t   i;
+    ssize_t   i, start;
 
-    if (!key || !d) return;
-    hash = ml_dictionary_hash(key);
+    if (!key || !d || d->size == 0) return;
+    hash  = ml_dictionary_hash(key);
+    start = (ssize_t)(hash % (unsigned)d->size);
     for (i = 0; i < d->size; i++) {
-        if (!d->key[i]) continue;
-        if (hash == d->hash[i] && !strcmp(key, d->key[i]))
-            break;
+        ssize_t idx = (start + i) % d->size;
+        if (!d->key[idx]) continue;
+        if (hash == d->hash[idx] && !strcmp(key, d->key[idx])) {
+            free(d->key[idx]);
+            d->key[idx] = NULL;
+            free(d->val[idx]);
+            d->val[idx]  = NULL;
+            d->hash[idx] = 0;
+            d->n--;
+            return;
+        }
     }
-    if (i >= d->size) return;
-    free(d->key[i]);
-    d->key[i] = NULL;
-    free(d->val[i]);
-    d->val[i]  = NULL;
-    d->hash[i] = 0;
-    d->n--;
 }
 
 void ml_dictionary_dump(const ml_dictionary_t *d, FILE *out)
