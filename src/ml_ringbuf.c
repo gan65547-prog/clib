@@ -21,6 +21,8 @@ ml_int_t ml_kring_create(char * path, ml_uint_t length, ml_kring_t * kr)
     ml_uint8_t * data;
     ml_uint_t  size = sizeof(ml_kbuff_t) + length;
 
+    if (!path || !kr || length == 0 || (length & (length - 1)) != 0)
+        return ML_EPARAM;
 
     ret = ml_file_map_create(&kr->m_mmap, path, size);
 
@@ -57,6 +59,9 @@ ml_int_t ml_kring_lookup(char * path,  ml_kring_t * kr)
 
     struct stat sb;
 
+    if (!path || !kr)
+        return ML_EPARAM;
+
     ml_memzero(&sb, sizeof(sb));
 
     if (0 != stat(path, &sb))
@@ -80,6 +85,7 @@ ml_int_t ml_kring_lookup(char * path,  ml_kring_t * kr)
 
 void ml_kring_destroy(ml_kring_t * kr)
 {
+    if (!kr || !kr->m_kbuff) return;
     pthread_mutex_destroy(&kr->m_kbuff->m_mutex);
     pthread_mutexattr_destroy(&kr->m_kbuff->m_attr);
     ml_file_map_destroy(&kr->m_mmap);
@@ -90,6 +96,8 @@ void ml_kring_destroy(ml_kring_t * kr)
 ml_uint_t ml_kring_empty(ml_kring_t * kr)
 {
     ml_uint_t ret;
+
+    if (!kr || !kr->m_kbuff) return ML_TRUE;
 
     pthread_mutex_lock(&kr->m_kbuff->m_mutex);
 
@@ -106,8 +114,13 @@ ml_uint_t ml_kring_empty(ml_kring_t * kr)
 ml_uint_t ml_kring_input(ml_kring_t * kr, void * buf, ml_uint_t len)
 {
     ml_uint_t l;
-    ml_kbuff_t * fifo = kr->m_kbuff;
-    ml_uint8_t * data = kr->m_data;
+    ml_kbuff_t * fifo;
+    ml_uint8_t * data;
+
+    if (!kr || !kr->m_kbuff || !buf || len == 0) return 0;
+
+    fifo = kr->m_kbuff;
+    data = kr->m_data;
 
     pthread_mutex_lock(&kr->m_kbuff->m_mutex);
 
@@ -129,8 +142,13 @@ ml_uint_t ml_kring_input(ml_kring_t * kr, void * buf, ml_uint_t len)
 ml_uint_t ml_kring_output(ml_kring_t * kr, void * buf, ml_uint_t len)
 {
     ml_uint_t l;
-    ml_kbuff_t * fifo = kr->m_kbuff;
-    ml_uint8_t * data = kr->m_data;
+    ml_kbuff_t * fifo;
+    ml_uint8_t * data;
+
+    if (!kr || !kr->m_kbuff || !buf || len == 0) return 0;
+
+    fifo = kr->m_kbuff;
+    data = kr->m_data;
 
     pthread_mutex_lock(&kr->m_kbuff->m_mutex);
 

@@ -6,6 +6,7 @@
 #include "test_framework.h"
 #include "../include/ml_types.h"
 #include "../include/mlfw/mlfw_http.h"
+/* Source symbols come from test_http_parser.o which includes ml_http.c */
 
 /* ---- Request parsing ---- */
 

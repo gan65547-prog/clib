@@ -7,6 +7,16 @@
 #include "ml_pool.h"
 #include "ml_code.h"
 
+#include <assert.h>
+
+/* Verify that ml_memory_s layout matches what the bump allocator expects.
+ * On LP64 (x86_64/aarch64): m_set+m_used pack into 8 B, m_size at +8,
+ * m_conn (rb_node 24B + data ptr 8B) at +16 → total 48.  If this fires,
+ * the compiler has placed the bitfields or padding differently than expected
+ * and the macros in ml_pool.h may read the wrong offsets. */
+static_assert(sizeof(ml_memory_t) >= 48,
+    "ml_memory_t size mismatch — bitfield/padding layout unexpected");
+
 
 
 
@@ -121,7 +131,9 @@ static int ml_pool_compare_callback(ml_container_node_t * data, ml_container_nod
     pd = ml_container_entry(data, ml_memory_t, m_conn);
     ps = ml_container_entry(src, ml_memory_t, m_conn);
 
-    return (ps->m_size - pd->m_size);
+    if (ps->m_size < pd->m_size)  return -1;
+    if (ps->m_size > pd->m_size)  return  1;
+    return 0;
 }
 
 

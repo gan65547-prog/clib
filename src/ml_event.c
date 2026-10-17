@@ -84,6 +84,7 @@ static void ml_event_wait(ml_event_t * ev, ml_int_t msec)
     for (i = 0; i < n; i++) {
     
         c = (ml_connection_t*)ev->m_ev[i].data.ptr;
+        if (!c) continue;
         events = ev->m_ev[i].events;
         error = 0;
 
@@ -95,13 +96,13 @@ static void ml_event_wait(ml_event_t * ev, ml_int_t msec)
         if (events & (EPOLLIN)) {
             c->m_error = error;
             f_handler = c->f_rdev;
-            f_handler(c);
+            if (f_handler) f_handler(c);
         }
 
         if (events & (EPOLLOUT)) {
             c->m_error = error;
             f_handler = c->f_wrev;
-            f_handler(c);
+            if (f_handler) f_handler(c);
         }
 
     }
@@ -129,14 +130,17 @@ ml_int_t ml_event_create(ml_event_t * ev, ml_epoll_event_t * ee, ml_int_t n)
     ev->f_cycle  = ml_event_wait;
     ev->f_call   = NULL;
 
-    return (ev->m_fd > 0) ? ML_OK : ML_ERROR;
+    return (ev->m_fd >= 0) ? ML_OK : ML_ERROR;
 }
 
 
 
 void ml_event_destroy(ml_event_t * ev)
 {
-    close(ev->m_fd);
+    if (!ev) return;
+    if (ev->m_fd >= 0)
+        close(ev->m_fd);
+    ev->m_fd = -1;
 }
 
 #endif /* __linux__ */

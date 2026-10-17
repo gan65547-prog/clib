@@ -1,8 +1,9 @@
 /*
- * ml_ringbuf — Lock-free SPSC ring buffer for cross-process communication.
+ * ml_ringbuf — Mutex-protected ring buffer for cross-process communication.
  *
- * Design: single producer / single consumer lock-free ring backed by mmap'd
- * shared memory.  Requires m_length to be a power of 2.
+ * Design: single producer / single consumer ring backed by mmap'd
+ * shared memory.  Uses process-shared pthread_mutex for cross-process
+ * synchronization.  Requires m_length to be a power of 2.
  *
  * Use ml_kring_create to initialise a new ring, or ml_kring_lookup to attach
  * to one that already exists.

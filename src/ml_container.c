@@ -24,8 +24,14 @@ int ml_set_insert(ml_container_t * set, fun_compare fun, ml_container_node_t * s
         if (result < 0) {
             new = &((*new)->rb_left);
         }
-        else if (result >= 0) {
+        else if (result > 0) {
             new = &((*new)->rb_right);
+        }
+        else {
+            /* equal key — insert left, consistent with ml_set_lookup's
+             * result <= 0 → left branch. This preserves the "find first
+             * matching" semantic used by pool's free-list lookup. */
+            new = &((*new)->rb_left);
         }
     }
 

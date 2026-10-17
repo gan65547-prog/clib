@@ -5,7 +5,10 @@
 
 clib is a portable C library for embedded and edge-device middleware. It provides
 memory pools, data structures, concurrency primitives, event-driven I/O, a JSON
-parser, an HTTP parser, and a plugin framework (mlfw).
+parser, and an HTTP parser.
+
+For the daemon/plugin/message-bus framework built on top of clib, see the sibling
+project [mlfw](../mlfw/).
 
 **Target**: Linux ARM64 (RK3588, etc.) and macOS development.
 
@@ -64,23 +67,6 @@ cc -I./include -o myapp myapp.c -L. -lclib -lpthread -lm
 | **List** | `ml_list.h` | Intrusive doubly-linked list |
 | **Inet** | `ml_inet.h` | TCP socket helpers |
 | **Connection** | `ml_connection.h` | Connection abstraction |
-
-### mlfw Framework (Linux only)
-
-| Module | Header | Description |
-|--------|--------|-------------|
-| **Module** | `mlfw_module.h` | Module descriptor and lifecycle |
-| **Daemon** | `mlfw_daemon.h` | Daemon lifecycle (config, init, event loop) |
-| **Message** | `mlfw_message.h` | Message header + routing |
-| **Message Bus** | `mlfw_message_bus.h` | UDS-based IPC message bus |
-| **Plugin** | `mlfw_plugin.h` | Plugin lifecycle (child process / script) |
-| **Process** | `mlfw_process.h` | Process title, signals, workspace |
-| **HTTP** | `mlfw_http.h` | HTTP/1.1 parser + response builder |
-| **HTTP Server** | `mlfw_http_server.h` | epoll-based HTTP server |
-| **Bridge** | `mlfw_bridge.h` | TCP bridge for multi-node forwarding |
-| **Connection Pool** | `mlfw_connection_pool.h` | Per-module connection pool |
-| **Set** | `mlfw_set.h` | Balanced-tree set (module registry) |
-| **Stream** | `mlfw_stream.h` | Unix Domain Socket helpers |
 
 ## Tests
 

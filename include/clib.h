@@ -44,6 +44,7 @@ extern "C" {
 /* ---- Concurrency ---- */
 #include "ml_thread.h"
 #include "ml_thread_pool.h"
+#include "ml_pipeline_stage.h"
 
 /* ---- I/O ---- */
 #include "ml_event.h"
@@ -60,23 +61,11 @@ extern "C" {
 #include "ml_llist.h"
 #include "ml_dll.h"
 
+/* ---- CV math ---- */
+#include "ml_cv_math.h"
+
 /* ---- OS helpers ---- */
 #include "ml_os.h"
-
-/* ---- mlfw framework (optional, Linux-only) ---- */
-#include "mlfw/mlfw_module.h"
-#include "mlfw/mlfw_daemon.h"
-#include "mlfw/mlfw_message.h"
-#include "mlfw/mlfw_message_bus.h"
-#include "mlfw/mlfw_plugin.h"
-#include "mlfw/mlfw_process.h"
-#include "mlfw/mlfw_http.h"
-#include "mlfw/mlfw_http_server.h"
-#include "mlfw/mlfw_bridge.h"
-#include "mlfw/mlfw_connection_pool.h"
-#include "mlfw/mlfw_set.h"
-#include "mlfw/mlfw_stream.h"
-#include "mlfw/mlfw_list.h"
 
 #ifdef __cplusplus
 }
