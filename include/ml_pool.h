@@ -17,6 +17,10 @@
 #include "ml_types.h"
 #include "ml_container.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 /**********************************************************
   内存池优点：
@@ -154,6 +158,9 @@ extern int  ml_pool_create(ml_pool_t * pool, ml_uint64_t size);
 /* 内存池析构函数，销毁内存池 */
 extern void ml_pool_destroy(ml_pool_t * pool);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

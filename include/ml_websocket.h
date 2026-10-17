@@ -15,6 +15,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* ── opcodes (RFC 6455 §5.2) ────────────────────────────────────────── */
 
 #define ML_WS_OPCODE_CONT   0x0   /* continuation frame */
@@ -121,5 +125,9 @@ void ml_ws_mask(char *data, size_t len, const uint8_t mask[4]);
 
 /* Human-readable opcode name for debugging/logging. */
 const char *ml_ws_opcode_name(int opcode);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __ML_WEBSOCKET_H__ */

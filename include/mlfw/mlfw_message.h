@@ -45,4 +45,19 @@ typedef struct {
 #define MLFW_PROJECT_EVENT_LEVEL   0xB006
 #define MLFW_PROJECT_EVENT_RESET   0xB007
 
+/* Pipeline control events (supervisor ↔ pipeline) */
+#define MLFW_PIPELINE_EVENT_HEARTBEAT  0xC001
+#define MLFW_PIPELINE_EVENT_REGISTER   0xC002
+#define MLFW_PIPELINE_EVENT_STATUS     0xC003
+#define MLFW_PIPELINE_EVENT_START      0xC004
+#define MLFW_PIPELINE_EVENT_STOP       0xC005
+#define MLFW_PIPELINE_EVENT_RELOAD     0xC006
+
+/* Session management events */
+#define MLFW_SESSION_EVENT_CREATE      0xD001
+#define MLFW_SESSION_EVENT_START       0xD002
+#define MLFW_SESSION_EVENT_STOP        0xD003
+#define MLFW_SESSION_EVENT_QUERY       0xD004
+#define MLFW_SESSION_EVENT_UPDATE      0xD005
+
 #endif /* MLFW_MESSAGE_H */

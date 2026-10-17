@@ -25,6 +25,7 @@ struct ml_queue_s {
     pthread_cond_t  not_empty;   /* signaled on push             */
     pthread_cond_t  not_full;    /* signaled on pop              */
     int             interrupted;
+    int             closed;
     ml_pool_t      *pool;
 };
 
@@ -114,10 +115,13 @@ ml_queue_push(ml_queue_t *q, void *item, int timeout_ms)
 
     pthread_mutex_lock(&q->mutex);
 
+    if (q->closed) { ret = ML_ERROR; goto done; }
+
     if (timeout_ms < 0) {
-        while (q->count == q->capacity && !q->interrupted)
+        while (q->count == q->capacity && !q->interrupted && !q->closed)
             pthread_cond_wait(&q->not_full, &q->mutex);
         if (q->interrupted) { ret = ML_ERROR; goto done; }
+        if (q->closed)      { ret = ML_ERROR; goto done; }
     } else if (timeout_ms == 0) {
         /* try once */
         if (q->count == q->capacity) {
@@ -130,7 +134,7 @@ ml_queue_push(ml_queue_t *q, void *item, int timeout_ms)
         clock_gettime(CLOCK_REALTIME, &ts);
         timespec_add_ms(&ts, timeout_ms);
 
-        while (q->count == q->capacity && !q->interrupted) {
+        while (q->count == q->capacity && !q->interrupted && !q->closed) {
             int rc = pthread_cond_timedwait(&q->not_full, &q->mutex, &ts);
             if (rc == ETIMEDOUT) {
                 ret = ML_EAGAIN;
@@ -138,6 +142,7 @@ ml_queue_push(ml_queue_t *q, void *item, int timeout_ms)
             }
         }
         if (q->interrupted) { ret = ML_ERROR; goto done; }
+        if (q->closed)      { ret = ML_ERROR; goto done; }
     }
 
     q->ring[q->tail] = item;
@@ -163,9 +168,10 @@ ml_queue_pop(ml_queue_t *q, void **item, int timeout_ms)
     pthread_mutex_lock(&q->mutex);
 
     if (timeout_ms < 0) {
-        while (q->count == 0 && !q->interrupted)
+        while (q->count == 0 && !q->interrupted && !q->closed)
             pthread_cond_wait(&q->not_empty, &q->mutex);
         if (q->interrupted) { ret = ML_ERROR; goto done; }
+        if (q->count == 0)  { ret = ML_ERROR; goto done; } /* closed */
     } else if (timeout_ms == 0) {
         /* try once */
         if (q->count == 0) {
@@ -178,7 +184,7 @@ ml_queue_pop(ml_queue_t *q, void **item, int timeout_ms)
         clock_gettime(CLOCK_REALTIME, &ts);
         timespec_add_ms(&ts, timeout_ms);
 
-        while (q->count == 0 && !q->interrupted) {
+        while (q->count == 0 && !q->interrupted && !q->closed) {
             int rc = pthread_cond_timedwait(&q->not_empty, &q->mutex, &ts);
             if (rc == ETIMEDOUT) {
                 ret = ML_EAGAIN;
@@ -186,6 +192,7 @@ ml_queue_pop(ml_queue_t *q, void **item, int timeout_ms)
             }
         }
         if (q->interrupted) { ret = ML_ERROR; goto done; }
+        if (q->count == 0)  { ret = ML_ERROR; goto done; } /* closed or timeout */
     }
 
     *item = q->ring[q->head];
@@ -241,4 +248,26 @@ ml_queue_interrupt(ml_queue_t *q)
     pthread_cond_broadcast(&q->not_empty);
     pthread_cond_broadcast(&q->not_full);
     pthread_mutex_unlock(&q->mutex);
+}
+
+void
+ml_queue_close(ml_queue_t *q)
+{
+    if (!q) return;
+    pthread_mutex_lock(&q->mutex);
+    q->closed = 1;
+    pthread_cond_broadcast(&q->not_empty);
+    pthread_cond_broadcast(&q->not_full);
+    pthread_mutex_unlock(&q->mutex);
+}
+
+int
+ml_queue_is_closed(const ml_queue_t *q)
+{
+    int result = 1;
+    if (!q) return 1;
+    pthread_mutex_lock((pthread_mutex_t *)&q->mutex);
+    result = q->closed;
+    pthread_mutex_unlock((pthread_mutex_t *)&q->mutex);
+    return result;
 }

@@ -21,6 +21,10 @@
 #include <stdbool.h>
 #include "ml_code.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct ml_queue_s ml_queue_t;
 typedef struct ml_pool_s  ml_pool_t;
 
@@ -61,5 +65,18 @@ bool ml_queue_empty(const ml_queue_t *q);
 bool ml_queue_full(const ml_queue_t *q);
 
 void ml_queue_interrupt(ml_queue_t *q);
+
+/* ── graceful shutdown ────────────────────────────────────────────── */
+
+/* Signal that no more items will be pushed.  Unlike interrupt(),
+ * close() allows the queue to be drained first — pop() will keep
+ * returning items until the queue is empty, then return ML_ERROR.
+ * push() to a closed queue returns ML_ERROR immediately. */
+void ml_queue_close(ml_queue_t *q);
+int  ml_queue_is_closed(const ml_queue_t *q);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __ML_QUEUE_H__ */

@@ -105,6 +105,7 @@ CORE_SOURCES = \
     src/ml_ringbuf.c \
     src/ml_set_rbtree.c \
     src/ml_shm_pool.c \
+    src/ml_stream.c \
     src/ml_string.c \
     src/ml_thread.c \
     src/ml_thread_pool.c \
