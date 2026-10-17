@@ -96,7 +96,7 @@ CORE_SOURCES = \
     src/ml_mapkey.c \
     src/ml_md5.c \
     src/ml_mmap.c \
-    src/ml_mux.c \
+    src/ml_muxer.c \
     src/ml_pipeline_stage.c \
     src/ml_pkbuf.c \
     src/ml_pool.c \

@@ -2,10 +2,10 @@
  * Copyright (c) 2026 Gan
  * SPDX-License-Identifier: MIT
  *
- * ml_mux.c — FFmpeg libavformat muxer for H.264/H.265 → MP4/FLV/MKV.
+ * ml_muxer.c — FFmpeg libavformat muxer for H.264/H.265 → MP4/FLV/MKV.
  */
 
-#include "ml_mux.h"
+#include "ml_muxer.h"
 #include "ml_pool.h"
 
 #include <libavformat/avformat.h>
@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct ml_mux_s {
+struct ml_muxer_s {
     AVFormatContext *ctx;
     AVStream        *stream;
     ml_pool_t       *pool;
@@ -24,14 +24,14 @@ struct ml_mux_s {
     int64_t          last_dts;
 };
 
-static void *mux_alloc(ml_pool_t *pool, size_t size)
+static void *muxer_alloc(ml_pool_t *pool, size_t size)
 {
     if (pool)
         return pool->f_alloc(pool, size);
     return malloc(size);
 }
 
-static void mux_free(ml_pool_t *pool, void *p)
+static void muxer_free(ml_pool_t *pool, void *p)
 {
     if (!p) return;
     if (pool)
@@ -43,32 +43,32 @@ static void mux_free(ml_pool_t *pool, void *p)
 /* ── helpers ────────────────────────────────────────────────────────── */
 
 static const char *
-format_name(ml_mux_format_e fmt)
+format_name(ml_muxer_format_e fmt)
 {
     switch (fmt) {
-    case ML_MUX_FMT_MP4: return "mp4";
-    case ML_MUX_FMT_FLV: return "flv";
-    case ML_MUX_FMT_MKV: return "matroska";
-    default:             return NULL;
+    case ML_MUXER_FMT_MP4: return "mp4";
+    case ML_MUXER_FMT_FLV: return "flv";
+    case ML_MUXER_FMT_MKV: return "matroska";
+    default:               return NULL;
     }
 }
 
 static enum AVCodecID
-codec_id(ml_mux_codec_e c)
+codec_id(ml_muxer_codec_e c)
 {
     switch (c) {
-    case ML_MUX_CODEC_H264: return AV_CODEC_ID_H264;
-    case ML_MUX_CODEC_H265: return AV_CODEC_ID_HEVC;
-    default:                return AV_CODEC_ID_NONE;
+    case ML_MUXER_CODEC_H264: return AV_CODEC_ID_H264;
+    case ML_MUXER_CODEC_H265: return AV_CODEC_ID_HEVC;
+    default:                  return AV_CODEC_ID_NONE;
     }
 }
 
 /* ── lifecycle ──────────────────────────────────────────────────────── */
 
-ml_mux_t *
-ml_mux_create(const char *filename, ml_mux_format_e fmt, ml_pool_t *pool)
+ml_muxer_t *
+ml_muxer_create(const char *filename, ml_muxer_format_e fmt, ml_pool_t *pool)
 {
-    ml_mux_t *m;
+    ml_muxer_t *m;
     const char *fname;
     const AVOutputFormat *ofmt;
     int ret;
@@ -81,14 +81,14 @@ ml_mux_create(const char *filename, ml_mux_format_e fmt, ml_pool_t *pool)
     ofmt = av_guess_format(fname, NULL, NULL);
     if (!ofmt) return NULL;
 
-    m = (ml_mux_t *)mux_alloc(pool, sizeof(*m));
+    m = (ml_muxer_t *)muxer_alloc(pool, sizeof(*m));
     if (!m) return NULL;
     memset(m, 0, sizeof(*m));
     m->pool = pool;
 
     ret = avformat_alloc_output_context2(&m->ctx, ofmt, NULL, filename);
     if (ret < 0 || !m->ctx) {
-        mux_free(pool, m);
+        muxer_free(pool, m);
         return NULL;
     }
 
@@ -98,10 +98,10 @@ ml_mux_create(const char *filename, ml_mux_format_e fmt, ml_pool_t *pool)
 /* ── configuration ──────────────────────────────────────────────────── */
 
 int
-ml_mux_set_video(ml_mux_t *m, ml_mux_codec_e codec,
-                 int width, int height,
-                 int fps_num, int fps_den,
-                 const uint8_t *extradata, size_t extradata_len)
+ml_muxer_set_video(ml_muxer_t *m, ml_muxer_codec_e codec,
+                   int width, int height,
+                   int fps_num, int fps_den,
+                   const uint8_t *extradata, size_t extradata_len)
 {
     AVCodecParameters *par;
     enum AVCodecID cid;
@@ -139,7 +139,7 @@ ml_mux_set_video(ml_mux_t *m, ml_mux_codec_e codec,
 /* ── write header ───────────────────────────────────────────────────── */
 
 int
-ml_mux_write_header(ml_mux_t *m)
+ml_muxer_write_header(ml_muxer_t *m)
 {
     int ret;
 
@@ -161,8 +161,8 @@ ml_mux_write_header(ml_mux_t *m)
 /* ── write frame ────────────────────────────────────────────────────── */
 
 int
-ml_mux_write_frame(ml_mux_t *m, const uint8_t *data, size_t len,
-                   int64_t pts_ms, int keyframe)
+ml_muxer_write_frame(ml_muxer_t *m, const uint8_t *data, size_t len,
+                     int64_t pts_ms, int keyframe)
 {
     AVPacket *pkt;
     int ret;
@@ -204,7 +204,7 @@ ml_mux_write_frame(ml_mux_t *m, const uint8_t *data, size_t len,
 /* ── destroy ────────────────────────────────────────────────────────── */
 
 void
-ml_mux_destroy(ml_mux_t *m)
+ml_muxer_destroy(ml_muxer_t *m)
 {
     ml_pool_t *pool;
 
@@ -219,5 +219,5 @@ ml_mux_destroy(ml_mux_t *m)
     avformat_free_context(m->ctx);
 
     pool = m->pool;
-    mux_free(pool, m);
+    muxer_free(pool, m);
 }

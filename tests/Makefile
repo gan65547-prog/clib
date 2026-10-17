@@ -23,7 +23,7 @@ endif
 
 UNAME_S := $(shell uname -s)
 
-# FFmpeg (for test_mux)
+# FFmpeg (for test_muxer)
 FFMPEG_CFLAGS := $(shell pkg-config --cflags libavformat libavcodec libavutil libswscale 2>/dev/null)
 FFMPEG_LIBS   := $(shell pkg-config --libs libavformat libavcodec libavutil libswscale 2>/dev/null)
 ifeq ($(FFMPEG_LIBS),)
@@ -78,7 +78,7 @@ SOURCES = main.c \
           test_queue.c \
           test_http_parser.c \
           test_websocket.c \
-          test_mux.c \
+          test_muxer.c \
           test_codec.c \
           test_camera.c \
           test_rga.c \

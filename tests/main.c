@@ -33,7 +33,7 @@ void test_crypto_suite(void);
 void test_queue_suite(void);
 void test_http_parser_suite(void);
 void test_websocket_suite(void);
-void test_mux_suite(void);
+void test_muxer_suite(void);
 void test_codec_suite(void);
 void test_camera_suite(void);
 void test_rga_suite(void);
@@ -72,7 +72,7 @@ int main(void) {
     test_queue_suite();
     test_http_parser_suite();
     test_websocket_suite();
-    test_mux_suite();
+    test_muxer_suite();
     test_codec_suite();
     test_camera_suite();
     test_rga_suite();
