@@ -83,6 +83,7 @@ SOURCES = main.c \
           test_camera.c \
           test_rga.c \
           test_cv_math.c \
+          test_domain_algo.c \
           test_pipeline_stage.c \
           ../src/ml_rbtree.c \
           ../src/ml_container.c \
@@ -92,7 +93,11 @@ SOURCES = main.c \
           ../src/ml_iniparser.c \
           ../src/ml_shm_pool.c \
           ../src/ml_zero_copy.c \
+          ../src/ml_counter.c \
           ../src/ml_cv_math.c \
+          ../src/ml_debounce.c \
+          ../src/ml_range_finder.c \
+          ../src/ml_temporal_window.c \
           ../src/ml_pipeline_stage.c
 
 OBJECTS = $(SOURCES:.c=.o)

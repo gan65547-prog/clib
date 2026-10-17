@@ -6,6 +6,8 @@
 #include "ml_cv_math.h"
 #include <math.h>
 #include <float.h>
+#include <string.h>
+#include <stdlib.h>
 
 /* ── internal helpers ───────────────────────────────────────────────── */
 
@@ -242,4 +244,160 @@ ml_euclidean_distance(const float *a, const float *b, int n)
         sum += diff * diff;
     }
     return sqrtf(sum);
+}
+
+/* ── NMS (non-maximum suppression) ─────────────────────────────────── */
+
+static int nms_score_desc(const void *a, const void *b)
+{
+    float sa = ((const ml_nms_box_t *)a)->score;
+    float sb = ((const ml_nms_box_t *)b)->score;
+    return (sa < sb) ? 1 : ((sa > sb) ? -1 : 0);
+}
+
+int
+ml_nms_multi_class(ml_nms_box_t *boxes, int count, float iou_threshold)
+{
+    int i, j, keep_count;
+
+    if (!boxes || count <= 1) return count;
+
+    /* sort by score descending */
+    qsort(boxes, (size_t)count, sizeof(ml_nms_box_t), nms_score_desc);
+
+    /* allocate keep flags on stack for small N; heap for safety */
+    char  stack_buf[256];
+    char *keep;
+    int   use_heap = (count > 256);
+
+    keep = use_heap ? (char *)calloc((size_t)count, 1) : stack_buf;
+    if (!keep) return count;
+    if (!use_heap) memset(stack_buf, 1, (size_t)count);
+    else           memset(keep, 1, (size_t)count);
+
+    for (i = 0; i < count; i++) {
+        ml_rect_t a;
+        if (!keep[i]) continue;
+        a.x = boxes[i].x; a.y = boxes[i].y;
+        a.width = boxes[i].width; a.height = boxes[i].height;
+
+        for (j = i + 1; j < count; j++) {
+            ml_rect_t b;
+            if (!keep[j]) continue;
+            if (boxes[i].class_id != boxes[j].class_id) continue;
+
+            b.x = boxes[j].x; b.y = boxes[j].y;
+            b.width = boxes[j].width; b.height = boxes[j].height;
+
+            if (ml_iou(a, b) > iou_threshold)
+                keep[j] = 0;
+        }
+    }
+
+    /* compact — move kept boxes to front */
+    keep_count = 0;
+    for (i = 0; i < count; i++) {
+        if (keep[i]) {
+            if (keep_count != i)
+                boxes[keep_count] = boxes[i];
+            keep_count++;
+        }
+    }
+
+    if (use_heap) free(keep);
+    return keep_count;
+}
+
+/* ── coordinate transform ──────────────────────────────────────────── */
+
+void
+ml_letterbox_to_source(float *x, float *y,
+                       int src_w, int src_h,
+                       int model_w, int model_h)
+{
+    float scale, pad_x, pad_y;
+
+    if (!x || !y) return;
+
+    scale = (float)model_w / (float)src_w;
+    {
+        float scale_h = (float)model_h / (float)src_h;
+        if (scale_h < scale) scale = scale_h;
+    }
+
+    pad_x = ((float)model_w - (float)src_w * scale) * 0.5f;
+    pad_y = ((float)model_h - (float)src_h * scale) * 0.5f;
+
+    *x = (*x - pad_x) / scale;
+    *y = (*y - pad_y) / scale;
+}
+
+ml_rect_t
+ml_rect_clamp(ml_rect_t r, float img_w, float img_h)
+{
+    if (r.x < 0.0f)      { r.width += r.x; r.x = 0.0f; }
+    if (r.y < 0.0f)      { r.height += r.y; r.y = 0.0f; }
+    if (r.x + r.width  > img_w) r.width  = img_w - r.x;
+    if (r.y + r.height > img_h) r.height = img_h - r.y;
+    if (r.width  < 0.0f) r.width  = 0.0f;
+    if (r.height < 0.0f) r.height = 0.0f;
+    return r;
+}
+
+/* ── 1D Kalman filter ──────────────────────────────────────────────── */
+
+void
+ml_kalman1d_init(ml_kalman1d_t *kf, float process_noise,
+                 float measure_noise, float init_est, float init_err)
+{
+    if (!kf) return;
+    kf->x   = init_est;
+    kf->v   = 0.0f;
+    kf->p11 = init_err;
+    kf->p22 = init_err;
+    kf->q   = process_noise;
+    kf->r   = measure_noise;
+}
+
+void
+ml_kalman1d_predict(ml_kalman1d_t *kf, float dt)
+{
+    if (!kf) return;
+    kf->x = kf->x + kf->v * dt;
+    kf->p11 = kf->p11 + 2.0f * dt * kf->p11 + dt * dt * kf->p22 + kf->q;
+    kf->p22 = kf->p22 + kf->q;
+}
+
+void
+ml_kalman1d_update(ml_kalman1d_t *kf, float measurement)
+{
+    float k;
+    if (!kf) return;
+    k = kf->p11 / (kf->p11 + kf->r);
+    kf->x = kf->x + k * (measurement - kf->x);
+    kf->v = kf->v + k * (measurement - kf->x);
+    kf->p11 = (1.0f - k) * kf->p11;
+    kf->p22 = (1.0f - k * 0.5f) * kf->p22;
+}
+
+float
+ml_kalman1d_estimate(const ml_kalman1d_t *kf)
+{
+    return kf ? kf->x : 0.0f;
+}
+
+float
+ml_kalman1d_velocity(const ml_kalman1d_t *kf)
+{
+    return kf ? kf->v : 0.0f;
+}
+
+void
+ml_kalman1d_reset(ml_kalman1d_t *kf, float estimate)
+{
+    if (!kf) return;
+    kf->x   = estimate;
+    kf->v   = 0.0f;
+    kf->p11 = 1.0f;
+    kf->p22 = 1.0f;
 }

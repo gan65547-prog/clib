@@ -85,7 +85,9 @@ CORE_SOURCES = \
     src/ml_bitmap.c \
     src/ml_container.c \
     src/ml_crypto.c \
+    src/ml_counter.c \
     src/ml_cv_math.c \
+    src/ml_debounce.c \
     src/ml_dictionary.c \
     src/ml_event.c \
     src/ml_frame.c \
@@ -101,6 +103,7 @@ CORE_SOURCES = \
     src/ml_pkbuf.c \
     src/ml_pool.c \
     src/ml_queue.c \
+    src/ml_range_finder.c \
     src/ml_rbtree.c \
     src/ml_ringbuf.c \
     src/ml_set_rbtree.c \
@@ -108,6 +111,7 @@ CORE_SOURCES = \
     src/ml_stream.c \
     src/ml_string.c \
     src/ml_thread.c \
+    src/ml_temporal_window.c \
     src/ml_thread_pool.c \
     src/ml_timer.c \
     src/ml_websocket.c \

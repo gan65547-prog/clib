@@ -38,6 +38,7 @@ void test_codec_suite(void);
 void test_camera_suite(void);
 void test_rga_suite(void);
 void test_cv_math_suite(void);
+void test_domain_algo_suite(void);
 void test_pipeline_stage_suite(void);
 
 int main(void) {
@@ -77,6 +78,7 @@ int main(void) {
     test_camera_suite();
     test_rga_suite();
     test_cv_math_suite();
+    test_domain_algo_suite();
     test_pipeline_stage_suite();
 
     PRINT_RESULTS();
