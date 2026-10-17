@@ -10,6 +10,7 @@
 
 #include <openssl/evp.h>
 #include <openssl/rand.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -78,8 +79,12 @@ void
 ml_crypto_destroy(ml_crypto_t *c)
 {
     if (!c) return;
-    /* zero key before free */
-    memset(c->key, 0, ML_CRYPTO_KEY_LEN);
+    /* zero key before free — volatile pointer prevents compiler elision */
+    {
+        volatile uint8_t *kp = c->key;
+        size_t i;
+        for (i = 0; i < ML_CRYPTO_KEY_LEN; i++) kp[i] = 0;
+    }
     c->pool->f_free(c->pool, c);
 }
 
@@ -104,6 +109,11 @@ ml_crypto_encrypt(ml_crypto_t *c,
 
     if (!c || !src || !dst || !dst_len) {
         set_error(c, "NULL argument");
+        return ML_EINVAL;
+    }
+
+    if (src_len > (size_t)INT_MAX || aad_len > (size_t)INT_MAX) {
+        set_error(c, "input too large");
         return ML_EINVAL;
     }
 
@@ -185,6 +195,11 @@ ml_crypto_decrypt(ml_crypto_t *c,
         return ML_EINVAL;
     }
 
+    if (aad_len > (size_t)INT_MAX) {
+        set_error(c, "AAD too large");
+        return ML_EINVAL;
+    }
+
     /* parse header */
     if (src_len < ML_CRYPTO_HEADER_SIZE) {
         set_error(c, "data too short for crypto header");
@@ -205,6 +220,11 @@ ml_crypto_decrypt(ml_crypto_t *c,
     tag        = src + 18;
     ciphertext = src + ML_CRYPTO_HEADER_SIZE;
     ct_len     = src_len - ML_CRYPTO_HEADER_SIZE;
+
+    if (ct_len > (size_t)INT_MAX) {
+        set_error(c, "ciphertext too large");
+        return ML_EINVAL;
+    }
 
     ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {

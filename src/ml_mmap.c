@@ -23,7 +23,7 @@
 
 
 
-int  ml_mmap_connect(ml_mmap_t *mm, char * path, size_t length)
+int  ml_mmap_connect(ml_mmap_t *mm, const char * path, size_t length)
 {
     if (!mm || !path || length == 0)
         return ML_EPARAM;
@@ -52,7 +52,7 @@ int  ml_mmap_connect(ml_mmap_t *mm, char * path, size_t length)
 
 
 
-int  ml_mmap_create(ml_mmap_t *mm, char * path, size_t length)
+int  ml_mmap_create(ml_mmap_t *mm, const char * path, size_t length)
 {
     if (!mm || !path || length == 0)
         return ML_EPARAM;

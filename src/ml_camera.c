@@ -4,19 +4,13 @@
  *
  * ml_camera.c — Camera dispatcher.
  *
- * Routes public ml_camera_* calls to the correct backend based on
- * cfg->backend at create time and cam->backend for subsequent ops.
- * Each backend implements the internal ml_camera_{v4l2,rtsp,stub}_*
- * functions declared in ml_camera_private.h.
+ * Routes public ml_camera_* calls through a vtable (ml_camera_ops_t)
+ * stored in cam->ops at create time.  Adding a new backend only
+ * requires implementing the ops struct and adding one case to
+ * ml_camera_create.
  */
 
 #include "ml_camera_private.h"
-
-typedef struct { int backend; } ml_camera_hdr_t;
-
-#define CAM_BACKEND(c) (((ml_camera_hdr_t *)(c))->backend)
-
-/* ── lifecycle ────────────────────────────────────────────────────────── */
 
 ml_camera_t *
 ml_camera_create(const ml_camera_cfg_t *cfg, ml_pool_t *pool)
@@ -32,176 +26,74 @@ ml_camera_create(const ml_camera_cfg_t *cfg, ml_pool_t *pool)
 #endif
     case ML_CAMERA_BACKEND_FILE:
     case ML_CAMERA_BACKEND_IMAGE:
-    default:
         return ml_camera_stub_create(cfg, pool);
+    default:
+        return NULL;
     }
 }
 
-void
-ml_camera_destroy(ml_camera_t *cam)
+void ml_camera_destroy(ml_camera_t *cam)
 {
-    if (!cam) return;
-
-    switch (CAM_BACKEND(cam)) {
-#ifdef ML_CAMERA_HAS_V4L2
-    case ML_CAMERA_BACKEND_V4L2: ml_camera_v4l2_destroy(cam); break;
-#endif
-#ifdef ML_CAMERA_HAS_RTSP
-    case ML_CAMERA_BACKEND_RTSP: ml_camera_rtsp_destroy(cam); break;
-#endif
-    default: ml_camera_stub_destroy(cam); break;
-    }
+    if (!cam || !cam->ops || !cam->ops->destroy) return;
+    cam->ops->destroy(cam);
 }
-
-/* ── capture control ──────────────────────────────────────────────────── */
 
 int ml_camera_start(ml_camera_t *cam)
 {
-    if (!cam) return -1;
-
-    switch (CAM_BACKEND(cam)) {
-#ifdef ML_CAMERA_HAS_V4L2
-    case ML_CAMERA_BACKEND_V4L2: return ml_camera_v4l2_start(cam);
-#endif
-#ifdef ML_CAMERA_HAS_RTSP
-    case ML_CAMERA_BACKEND_RTSP: return ml_camera_rtsp_start(cam);
-#endif
-    default: return ml_camera_stub_start(cam);
-    }
+    if (!cam || !cam->ops || !cam->ops->start) return -1;
+    return cam->ops->start(cam);
 }
 
 int ml_camera_stop(ml_camera_t *cam)
 {
-    if (!cam) return -1;
-
-    switch (CAM_BACKEND(cam)) {
-#ifdef ML_CAMERA_HAS_V4L2
-    case ML_CAMERA_BACKEND_V4L2: return ml_camera_v4l2_stop(cam);
-#endif
-#ifdef ML_CAMERA_HAS_RTSP
-    case ML_CAMERA_BACKEND_RTSP: return ml_camera_rtsp_stop(cam);
-#endif
-    default: return ml_camera_stub_stop(cam);
-    }
+    if (!cam || !cam->ops || !cam->ops->stop) return -1;
+    return cam->ops->stop(cam);
 }
-
-/* ── synchronous read ─────────────────────────────────────────────────── */
 
 int ml_camera_read(ml_camera_t *cam, ml_frame_t *frame, int timeout_ms)
 {
-    if (!cam) return -1;
-
-    switch (CAM_BACKEND(cam)) {
-#ifdef ML_CAMERA_HAS_V4L2
-    case ML_CAMERA_BACKEND_V4L2: return ml_camera_v4l2_read(cam, frame, timeout_ms);
-#endif
-#ifdef ML_CAMERA_HAS_RTSP
-    case ML_CAMERA_BACKEND_RTSP: return ml_camera_rtsp_read(cam, frame, timeout_ms);
-#endif
-    default: return ml_camera_stub_read(cam, frame, timeout_ms);
-    }
+    if (!cam || !cam->ops || !cam->ops->read) return -1;
+    return cam->ops->read(cam, frame, timeout_ms);
 }
 
 void ml_camera_frame_release(ml_camera_t *cam, ml_frame_t *frame)
 {
-    if (!cam) return;
-
-    switch (CAM_BACKEND(cam)) {
-#ifdef ML_CAMERA_HAS_V4L2
-    case ML_CAMERA_BACKEND_V4L2: ml_camera_v4l2_frame_release(cam, frame); break;
-#endif
-#ifdef ML_CAMERA_HAS_RTSP
-    case ML_CAMERA_BACKEND_RTSP: ml_camera_rtsp_frame_release(cam, frame); break;
-#endif
-    default: ml_camera_stub_frame_release(cam, frame); break;
-    }
+    if (!cam || !cam->ops || !cam->ops->frame_release) return;
+    cam->ops->frame_release(cam, frame);
 }
-
-/* ── async callback mode ──────────────────────────────────────────────── */
 
 int ml_camera_set_callback(ml_camera_t *cam, ml_camera_frame_cb cb, void *data)
 {
-    if (!cam) return -1;
-
-    switch (CAM_BACKEND(cam)) {
-#ifdef ML_CAMERA_HAS_V4L2
-    case ML_CAMERA_BACKEND_V4L2: return ml_camera_v4l2_set_callback(cam, cb, data);
-#endif
-#ifdef ML_CAMERA_HAS_RTSP
-    case ML_CAMERA_BACKEND_RTSP: return ml_camera_rtsp_set_callback(cam, cb, data);
-#endif
-    default: return ml_camera_stub_set_callback(cam, cb, data);
-    }
+    if (!cam || !cam->ops || !cam->ops->set_callback) return -1;
+    return cam->ops->set_callback(cam, cb, data);
 }
-
-/* ── query ────────────────────────────────────────────────────────────── */
 
 int ml_camera_get_width(ml_camera_t *cam)
 {
-    if (!cam) return -1;
-    switch (CAM_BACKEND(cam)) {
-#ifdef ML_CAMERA_HAS_V4L2
-    case ML_CAMERA_BACKEND_V4L2: return ml_camera_v4l2_get_width(cam);
-#endif
-#ifdef ML_CAMERA_HAS_RTSP
-    case ML_CAMERA_BACKEND_RTSP: return ml_camera_rtsp_get_width(cam);
-#endif
-    default: return ml_camera_stub_get_width(cam);
-    }
+    if (!cam || !cam->ops || !cam->ops->get_width) return -1;
+    return cam->ops->get_width(cam);
 }
 
 int ml_camera_get_height(ml_camera_t *cam)
 {
-    if (!cam) return -1;
-    switch (CAM_BACKEND(cam)) {
-#ifdef ML_CAMERA_HAS_V4L2
-    case ML_CAMERA_BACKEND_V4L2: return ml_camera_v4l2_get_height(cam);
-#endif
-#ifdef ML_CAMERA_HAS_RTSP
-    case ML_CAMERA_BACKEND_RTSP: return ml_camera_rtsp_get_height(cam);
-#endif
-    default: return ml_camera_stub_get_height(cam);
-    }
+    if (!cam || !cam->ops || !cam->ops->get_height) return -1;
+    return cam->ops->get_height(cam);
 }
 
 int ml_camera_get_fps(ml_camera_t *cam)
 {
-    if (!cam) return -1;
-    switch (CAM_BACKEND(cam)) {
-#ifdef ML_CAMERA_HAS_V4L2
-    case ML_CAMERA_BACKEND_V4L2: return ml_camera_v4l2_get_fps(cam);
-#endif
-#ifdef ML_CAMERA_HAS_RTSP
-    case ML_CAMERA_BACKEND_RTSP: return ml_camera_rtsp_get_fps(cam);
-#endif
-    default: return ml_camera_stub_get_fps(cam);
-    }
+    if (!cam || !cam->ops || !cam->ops->get_fps) return -1;
+    return cam->ops->get_fps(cam);
 }
 
 int ml_camera_get_state(ml_camera_t *cam)
 {
-    if (!cam) return -1;
-    switch (CAM_BACKEND(cam)) {
-#ifdef ML_CAMERA_HAS_V4L2
-    case ML_CAMERA_BACKEND_V4L2: return ml_camera_v4l2_get_state(cam);
-#endif
-#ifdef ML_CAMERA_HAS_RTSP
-    case ML_CAMERA_BACKEND_RTSP: return ml_camera_rtsp_get_state(cam);
-#endif
-    default: return ml_camera_stub_get_state(cam);
-    }
+    if (!cam || !cam->ops || !cam->ops->get_state) return -1;
+    return cam->ops->get_state(cam);
 }
 
 const char *ml_camera_error(ml_camera_t *cam)
 {
-    if (!cam) return NULL;
-    switch (CAM_BACKEND(cam)) {
-#ifdef ML_CAMERA_HAS_V4L2
-    case ML_CAMERA_BACKEND_V4L2: return ml_camera_v4l2_error(cam);
-#endif
-#ifdef ML_CAMERA_HAS_RTSP
-    case ML_CAMERA_BACKEND_RTSP: return ml_camera_rtsp_error(cam);
-#endif
-    default: return ml_camera_stub_error(cam);
-    }
+    if (!cam || !cam->ops || !cam->ops->error) return NULL;
+    return cam->ops->error(cam);
 }

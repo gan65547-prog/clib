@@ -28,11 +28,11 @@ ml_int_t ml_event_add(ml_event_t * ev, ml_connection_t * c, ml_int_t state)
     else
         op = EPOLL_CTL_ADD;
 
-    c->m_alive = 1;
-
     if (-1 == epoll_ctl(ev->m_fd, op, c->m_fd, &ee)) {
         return ML_ERROR;
     }
+
+    c->m_alive = 1;
 
     return ML_OK;
 }
@@ -99,7 +99,7 @@ static void ml_event_wait(ml_event_t * ev, ml_int_t msec)
             if (f_handler) f_handler(c);
         }
 
-        if (events & (EPOLLOUT)) {
+        if ((events & EPOLLOUT) && c->m_alive) {
             c->m_error = error;
             f_handler = c->f_wrev;
             if (f_handler) f_handler(c);

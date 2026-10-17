@@ -8,12 +8,18 @@
  * Supports blocking (with timeout), non-blocking try, and infinite-wait
  * push/pop operations.  Stores opaque void* pointers — ownership of
  * pointed-to data stays with the caller.
+ *
+ * Thread safety: FULLY thread-safe.  All push/pop/query operations use
+ * internal mutex protection.  ml_queue_interrupt can be called from any
+ * thread to break blocked waits.  ml_queue_destroy is NOT safe to call
+ * while other threads are still using the queue.
  */
 
 #ifndef __ML_QUEUE_H__
 #define __ML_QUEUE_H__
 
 #include <stdbool.h>
+#include "ml_code.h"
 
 typedef struct ml_queue_s ml_queue_t;
 typedef struct ml_pool_s  ml_pool_t;
@@ -54,10 +60,6 @@ int  ml_queue_capacity(const ml_queue_t *q);
 bool ml_queue_empty(const ml_queue_t *q);
 bool ml_queue_full(const ml_queue_t *q);
 
-/* ── return codes ────────────────────────────────────────────────── */
-
-#define ML_OK      0
-#define ML_ERROR  -1
-#define ML_EAGAIN -5   /* operation would block / timeout */
+void ml_queue_interrupt(ml_queue_t *q);
 
 #endif /* __ML_QUEUE_H__ */

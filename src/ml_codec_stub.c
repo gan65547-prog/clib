@@ -65,8 +65,8 @@ ml_codec_receive_packet(ml_codec_t *c, ml_codec_pkt_t *pkt)
 int
 ml_codec_flush(ml_codec_t *c)
 {
-    (void)c;
-    return -1;
+    if (!c) return -1;
+    return 0;
 }
 
 int

@@ -14,6 +14,41 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+static void stub_destroy(ml_camera_t *cam) { free(cam); }
+static int  stub_start(ml_camera_t *cam) { (void)cam; return -1; }
+static int  stub_stop(ml_camera_t *cam) { (void)cam; return -1; }
+static int  stub_read(ml_camera_t *cam, ml_frame_t *f, int to)
+{ (void)cam; (void)f; (void)to; return -1; }
+static void stub_frame_release(ml_camera_t *cam, ml_frame_t *f)
+{ (void)cam; (void)f; }
+static int  stub_set_callback(ml_camera_t *cam, ml_camera_frame_cb cb, void *d)
+{ (void)cam; (void)cb; (void)d; return -1; }
+
+static int  stub_get_width(ml_camera_t *cam)  { (void)cam; return -1; }
+static int  stub_get_height(ml_camera_t *cam) { (void)cam; return -1; }
+static int  stub_get_fps(ml_camera_t *cam)    { (void)cam; return -1; }
+static int  stub_get_state(ml_camera_t *cam)  { return cam ? cam->state : -1; }
+
+static const char *stub_error(ml_camera_t *cam)
+{
+    if (!cam || !cam->err_msg[0]) return NULL;
+    return cam->err_msg;
+}
+
+const ml_camera_ops_t ml_camera_stub_ops = {
+    .destroy       = stub_destroy,
+    .start         = stub_start,
+    .stop          = stub_stop,
+    .read          = stub_read,
+    .frame_release = stub_frame_release,
+    .set_callback  = stub_set_callback,
+    .get_width     = stub_get_width,
+    .get_height    = stub_get_height,
+    .get_fps       = stub_get_fps,
+    .get_state     = stub_get_state,
+    .error         = stub_error,
+};
+
 ml_camera_t *
 ml_camera_stub_create(const ml_camera_cfg_t *cfg, ml_pool_t *pool)
 {
@@ -25,31 +60,11 @@ ml_camera_stub_create(const ml_camera_cfg_t *cfg, ml_pool_t *pool)
     if (!cam) return NULL;
 
     cam->backend = cfg->backend;
+    cam->ops     = &ml_camera_stub_ops;
     cam->cfg     = *cfg;
     cam->pool    = pool;
     cam->state   = ML_CAMERA_STATE_STOPPED;
     snprintf(cam->err_msg, sizeof(cam->err_msg),
              "camera backend %d not available on this platform", cfg->backend);
     return cam;
-}
-
-void ml_camera_stub_destroy(ml_camera_t *cam) { free(cam); }
-int  ml_camera_stub_start(ml_camera_t *cam)   { (void)cam; return -1; }
-int  ml_camera_stub_stop(ml_camera_t *cam)    { (void)cam; return -1; }
-int  ml_camera_stub_read(ml_camera_t *cam, ml_frame_t *f, int to)
-{ (void)cam; (void)f; (void)to; return -1; }
-void ml_camera_stub_frame_release(ml_camera_t *cam, ml_frame_t *f)
-{ (void)cam; (void)f; }
-int  ml_camera_stub_set_callback(ml_camera_t *cam, ml_camera_frame_cb cb, void *d)
-{ (void)cam; (void)cb; (void)d; return -1; }
-
-int  ml_camera_stub_get_width(ml_camera_t *cam)  { (void)cam; return -1; }
-int  ml_camera_stub_get_height(ml_camera_t *cam) { (void)cam; return -1; }
-int  ml_camera_stub_get_fps(ml_camera_t *cam)    { (void)cam; return -1; }
-int  ml_camera_stub_get_state(ml_camera_t *cam)  { return cam ? cam->state : -1; }
-
-const char *ml_camera_stub_error(ml_camera_t *cam)
-{
-    if (!cam || !cam->err_msg[0]) return NULL;
-    return cam->err_msg;
 }

@@ -1,6 +1,11 @@
 /*
  * Copyright (c) 2026 Gan
  * SPDX-License-Identifier: MIT
+ *
+ * set_rbtree — Low-level red-black tree for sorted key storage.
+ *
+ * Thread safety: NOT thread-safe.  All insert / delete / next operations
+ * must be externally synchronized if the tree is shared across threads.
  */
 
 #ifndef __ML_SET_RBTREE_H__

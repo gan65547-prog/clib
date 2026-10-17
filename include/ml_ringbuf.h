@@ -30,9 +30,9 @@ typedef struct {
 } ml_kring_t;
 
 /* Create a new ring buffer backed by a file at path. */
-ml_int_t  ml_kring_create(char *path, ml_uint_t length, ml_kring_t *kr);
+ml_int_t  ml_kring_create(const char *path, ml_uint_t length, ml_kring_t *kr);
 /* Attach to an existing ring buffer. */
-ml_int_t  ml_kring_lookup(char *path, ml_kring_t *kr);
+ml_int_t  ml_kring_lookup(const char *path, ml_kring_t *kr);
 /* Destroy the ring buffer and release resources. */
 void       ml_kring_destroy(ml_kring_t *kr);
 /* Returns non-zero if the ring is empty. */

@@ -647,11 +647,10 @@ int
 ml_codec_flush(ml_codec_t *c)
 {
     ml_codec_pkt_t pkt;
-    int ret;
+    int ret, total = 0;
 
     if (!c || !c->inited) return -1;
 
-    /* send EOS frame if not already sent */
     {
         MppFrame eos = NULL;
         mpp_frame_init(&eos);
@@ -662,9 +661,11 @@ ml_codec_flush(ml_codec_t *c)
         }
     }
 
-    ret = ml_codec_receive_packet(c, &pkt);
-    if (ret == 0 && pkt.size > 0) return 1;
-    if (ret == ML_EAGAIN)        return 0;
+    while ((ret = ml_codec_receive_packet(c, &pkt)) == 0) {
+        total++;
+    }
+
+    if (ret == ML_EAGAIN) return total;
     return ret;
 }
 

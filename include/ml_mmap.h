@@ -13,16 +13,16 @@
 typedef struct ml_mmap_s {
     ml_int_t     m_fd;
     size_t       m_size;
-    char     *    m_path;
+    const char   *    m_path;
     void     *    m_addr;
 } ml_mmap_t;
 
 /* Create a new mmap region backed by the file at path. */
-int  ml_mmap_create(ml_mmap_t *mm, char * path, size_t length);
+int  ml_mmap_create(ml_mmap_t *mm, const char * path, size_t length);
 /* Unmap and close the region. */
 void ml_mmap_destroy(ml_mmap_t *fm);
 /* Attach to an existing mmap region. */
-int  ml_mmap_connect(ml_mmap_t *fm, char * path, size_t length);
+int  ml_mmap_connect(ml_mmap_t *fm, const char * path, size_t length);
 
 /* Aliases used by the ring buffer module */
 typedef ml_mmap_t ml_file_map_t;

@@ -10,11 +10,18 @@
 #include "ml_pkbuf.h"
 
 
-ml_pkbuf_t * ml_pkbuf_alloc(ml_int_t size)
+ml_pkbuf_t * ml_pkbuf_alloc(ml_int_t size, ml_pool_t *pool)
 {
     ml_pkbuf_t * pkb;
 
-    pkb = (ml_pkbuf_t *)ml_alloc(sizeof(ml_pkbuf_t) + size);
+    if (size <= 0) return NULL;
+
+    if (pool) {
+        pkb = (ml_pkbuf_t *)pool->f_alloc(pool, sizeof(ml_pkbuf_t) + (size_t)size);
+    } else {
+        pkb = (ml_pkbuf_t *)ml_alloc(sizeof(ml_pkbuf_t) + (size_t)size);
+    }
+
     if (pkb) {
         pkb->f_handler   = NULL;
         pkb->m_node.next = NULL;
@@ -30,11 +37,18 @@ ml_pkbuf_t * ml_pkbuf_alloc(ml_int_t size)
         pkb->m_ssid  = 0;
         pkb->m_dsid  = 0;
         pkb->m_buff  = (ml_uint8_t*)(pkb+1);
+        pkb->m_pool  = pool;
 
         return pkb;
     }
     return NULL;
 }
 
-
-
+void ml_pkbuf_free(ml_pkbuf_t *pkb)
+{
+    if (!pkb) return;
+    if (pkb->m_pool)
+        pkb->m_pool->f_free(pkb->m_pool, pkb);
+    else
+        ml_free(pkb);
+}

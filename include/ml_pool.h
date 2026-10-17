@@ -1,6 +1,13 @@
 /*
  * Copyright (c) 2026 Gan
  * SPDX-License-Identifier: MIT
+ *
+ * ml_pool — Slab-style memory pool with small-page / large-block strategy.
+ *
+ * Thread safety: NOT thread-safe.  f_alloc / f_free and all pool management
+ * functions must be externally synchronized if the same pool is shared across
+ * threads.  It is recommended to use one pool per thread or protect access
+ * with a mutex.
  */
 
 #ifndef __ML_POOL_H__

@@ -6,6 +6,7 @@
  */
 
 #include "ml_mux.h"
+#include "ml_pool.h"
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
@@ -16,11 +17,28 @@
 struct ml_mux_s {
     AVFormatContext *ctx;
     AVStream        *stream;
+    ml_pool_t       *pool;
     int              fps_num;
     int              fps_den;
     int              header_written;
-    int64_t          last_dts;    /* for monotonic DTS tracking */
+    int64_t          last_dts;
 };
+
+static void *mux_alloc(ml_pool_t *pool, size_t size)
+{
+    if (pool)
+        return pool->f_alloc(pool, size);
+    return malloc(size);
+}
+
+static void mux_free(ml_pool_t *pool, void *p)
+{
+    if (!p) return;
+    if (pool)
+        pool->f_free(pool, p);
+    else
+        free(p);
+}
 
 /* ── helpers ────────────────────────────────────────────────────────── */
 
@@ -48,7 +66,7 @@ codec_id(ml_mux_codec_e c)
 /* ── lifecycle ──────────────────────────────────────────────────────── */
 
 ml_mux_t *
-ml_mux_create(const char *filename, ml_mux_format_e fmt)
+ml_mux_create(const char *filename, ml_mux_format_e fmt, ml_pool_t *pool)
 {
     ml_mux_t *m;
     const char *fname;
@@ -63,12 +81,14 @@ ml_mux_create(const char *filename, ml_mux_format_e fmt)
     ofmt = av_guess_format(fname, NULL, NULL);
     if (!ofmt) return NULL;
 
-    m = calloc(1, sizeof(*m));
+    m = (ml_mux_t *)mux_alloc(pool, sizeof(*m));
     if (!m) return NULL;
+    memset(m, 0, sizeof(*m));
+    m->pool = pool;
 
     ret = avformat_alloc_output_context2(&m->ctx, ofmt, NULL, filename);
     if (ret < 0 || !m->ctx) {
-        free(m);
+        mux_free(pool, m);
         return NULL;
     }
 
@@ -81,7 +101,7 @@ int
 ml_mux_set_video(ml_mux_t *m, ml_mux_codec_e codec,
                  int width, int height,
                  int fps_num, int fps_den,
-                 const uint8_t *extradata, int extradata_len)
+                 const uint8_t *extradata, size_t extradata_len)
 {
     AVCodecParameters *par;
     enum AVCodecID cid;
@@ -104,10 +124,8 @@ ml_mux_set_video(ml_mux_t *m, ml_mux_codec_e codec,
     m->fps_num = fps_num;
     m->fps_den = fps_den;
 
-    /* timebase: 1/fps for frame-level granularity */
     m->stream->time_base = (AVRational){ fps_den, fps_num };
 
-    /* extradata: SPS+PPS (H.264) or VPS+SPS+PPS (H.265) */
     if (extradata && extradata_len > 0) {
         par->extradata = av_mallocz(extradata_len + AV_INPUT_BUFFER_PADDING_SIZE);
         if (!par->extradata) return -1;
@@ -127,7 +145,6 @@ ml_mux_write_header(ml_mux_t *m)
 
     if (!m || !m->stream || m->header_written) return -1;
 
-    /* open output */
     if (!(m->ctx->flags & AVFMT_NOFILE)) {
         ret = avio_open(&m->ctx->pb, m->ctx->url, AVIO_FLAG_WRITE);
         if (ret < 0) return -1;
@@ -144,19 +161,18 @@ ml_mux_write_header(ml_mux_t *m)
 /* ── write frame ────────────────────────────────────────────────────── */
 
 int
-ml_mux_write_frame(ml_mux_t *m, const uint8_t *data, int len,
+ml_mux_write_frame(ml_mux_t *m, const uint8_t *data, size_t len,
                    int64_t pts_ms, int keyframe)
 {
     AVPacket *pkt;
     int ret;
 
-    if (!m || !m->stream || !m->header_written || !data || len <= 0)
+    if (!m || !m->stream || !m->header_written || !data || len == 0)
         return -1;
 
     pkt = av_packet_alloc();
     if (!pkt) return -1;
 
-    /* copy data — av_interleaved_write_frame takes ownership */
     if (av_new_packet(pkt, len) < 0) {
         av_packet_free(&pkt);
         return -1;
@@ -164,16 +180,6 @@ ml_mux_write_frame(ml_mux_t *m, const uint8_t *data, int len,
     memcpy(pkt->data, data, len);
     pkt->stream_index = m->stream->index;
 
-    /* convert ms → timebase units:
-     *   pts_ms       = ms
-     *   fps_num/den  = framerate
-     *   pts in stream timebase = pts_ms / 1000 * fps_num / fps_den
-     *                          = pts_ms * fps_num / (fps_den * 1000)
-     *
-     * More simply, we use the AVRational rescale:
-     *   pts_ms / 1000 seconds → timebase = {fps_den, fps_num}
-     *   pts_stream = pts_ms * fps_num / (fps_den * 1000)
-     */
     pkt->pts = av_rescale_q(pts_ms,
                             (AVRational){1, 1000},
                             m->stream->time_base);
@@ -182,7 +188,6 @@ ml_mux_write_frame(ml_mux_t *m, const uint8_t *data, int len,
     if (keyframe)
         pkt->flags |= AV_PKT_FLAG_KEY;
 
-    /* ensure monotonically increasing dts; keep pts in sync */
     if (pkt->dts <= m->last_dts) {
         int64_t delta = m->last_dts + 1 - pkt->dts;
         pkt->dts = m->last_dts + 1;
@@ -201,6 +206,8 @@ ml_mux_write_frame(ml_mux_t *m, const uint8_t *data, int len,
 void
 ml_mux_destroy(ml_mux_t *m)
 {
+    ml_pool_t *pool;
+
     if (!m) return;
 
     if (m->header_written)
@@ -210,5 +217,7 @@ ml_mux_destroy(ml_mux_t *m)
         avio_closep(&m->ctx->pb);
 
     avformat_free_context(m->ctx);
-    free(m);
+
+    pool = m->pool;
+    mux_free(pool, m);
 }

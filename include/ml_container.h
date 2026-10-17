@@ -1,6 +1,12 @@
 /*
  * Copyright (c) 2026 Gan
  * SPDX-License-Identifier: MIT
+ *
+ * ml_container — Red-black tree based sorted container (set / map).
+ *
+ * Thread safety: NOT thread-safe.  All operations (insert, lookup, erase,
+ * each, clean) must be externally synchronized if accessed from multiple
+ * threads.  The container does no internal locking.
  */
 
 #ifndef __ML_CONTAINER_H__

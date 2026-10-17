@@ -141,6 +141,10 @@ ml_container_node_t * ml_map_lookup(ml_container_t * map, fun_compare cmp, ml_co
             rbnode = rbnode->rb_right;
         }
         else {
+            if (lookup && !lookup(cur)) {
+                flag = 0;
+                break;
+            }
             flag = 1;
             break;
         }

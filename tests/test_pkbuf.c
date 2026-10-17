@@ -12,7 +12,7 @@
 #include "../src/ml_pkbuf.c"
 
 static void test_pkbuf_alloc(void) {
-    ml_pkbuf_t *pkb = ml_pkbuf_alloc(128);
+    ml_pkbuf_t *pkb = ml_pkbuf_alloc(128, NULL);
     ASSERT_PTR_NOT_NULL(pkb, "pkbuf alloc should succeed");
 
     ASSERT_EQ(pkb->m_blen, 128, "buffer length should be 128");
@@ -35,7 +35,7 @@ static void test_pkbuf_alloc(void) {
 }
 
 static void test_pkbuf_write_read(void) {
-    ml_pkbuf_t *pkb = ml_pkbuf_alloc(64);
+    ml_pkbuf_t *pkb = ml_pkbuf_alloc(64, NULL);
     ASSERT_PTR_NOT_NULL(pkb, "pkbuf alloc should succeed");
 
     const char *test_data = "Hello Packet Buffer!";
@@ -56,7 +56,7 @@ static void test_pkbuf_multiple_alloc(void) {
 
     for (int i = 0; i < 10; i++) {
         sizes[i] = (i + 1) * 64;
-        bufs[i] = ml_pkbuf_alloc(sizes[i]);
+        bufs[i] = ml_pkbuf_alloc(sizes[i], NULL);
         ASSERT_PTR_NOT_NULL(bufs[i], "each alloc should succeed");
         ASSERT_EQ(bufs[i]->m_blen, sizes[i], "size should match requested");
     }
@@ -91,7 +91,7 @@ static void test_pring_input_output(void) {
     ml_pkbuf_t *pkts[3];
 
     for (int i = 0; i < 3; i++) {
-        pkts[i] = ml_pkbuf_alloc(32);
+        pkts[i] = ml_pkbuf_alloc(32, NULL);
         ASSERT_PTR_NOT_NULL(pkts[i], "pkt alloc should succeed");
     }
 
@@ -135,7 +135,7 @@ static void test_pring_wrap(void) {
     ml_pkbuf_t *items[8];
 
     for (int i = 0; i < 8; i++) {
-        items[i] = ml_pkbuf_alloc(16);
+        items[i] = ml_pkbuf_alloc(16, NULL);
         ASSERT_PTR_NOT_NULL(items[i], "alloc should succeed");
         items[i]->m_ssid = (unsigned int)i;
     }

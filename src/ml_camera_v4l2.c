@@ -23,6 +23,10 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+/* ── forward declarations ──────────────────────────────────────────────── */
+
+static void *camera_thread(void *arg);
+
 /* ── helpers ──────────────────────────────────────────────────────────── */
 
 static int xioctl(int fd, unsigned long req, void *arg)

@@ -33,7 +33,9 @@ static ml_int_t ml_mapinteger_compare(ml_container_node_t * data, ml_container_n
     pdata = ml_container_entry(data, ml_mapvalue_t, m_mapnd);
     psrc  = ml_container_entry(src, ml_mapvalue_t, m_mapnd);
 
-    return (psrc->m_keyid - pdata->m_keyid);
+    if (psrc->m_keyid < pdata->m_keyid) return -1;
+    if (psrc->m_keyid > pdata->m_keyid) return  1;
+    return 0;
 }
 
 

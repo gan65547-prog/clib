@@ -188,14 +188,22 @@ void ml_shm_free(ml_shm_pool_t *sp, void *p)
 
 ml_uint64_t ml_shm_used(const ml_shm_pool_t *sp)
 {
+    ml_uint64_t used;
     if (!sp || !sp->m_header)
         return 0;
-    return sp->m_header->m_offset - ml_shm_align64(sizeof(ml_shm_header_t));
+    ml_uatomic_lock((ml_uatomic_t *)&sp->m_header->m_lock);
+    used = sp->m_header->m_offset - ml_shm_align64(sizeof(ml_shm_header_t));
+    ml_uatomic_unlock((ml_uatomic_t *)&sp->m_header->m_lock);
+    return used;
 }
 
 ml_int_t ml_shm_refcount(const ml_shm_pool_t *sp)
 {
+    ml_int_t refcount;
     if (!sp || !sp->m_header)
         return 0;
-    return sp->m_header->m_refcount;
+    ml_uatomic_lock((ml_uatomic_t *)&sp->m_header->m_lock);
+    refcount = sp->m_header->m_refcount;
+    ml_uatomic_unlock((ml_uatomic_t *)&sp->m_header->m_lock);
+    return refcount;
 }

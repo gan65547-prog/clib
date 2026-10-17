@@ -472,7 +472,7 @@ static char *print_object(ml_json_t *item, int depth, int fmt)
 }
 
 /* ---- Query functions ---- */
-int ml_json_get_array_size(ml_json_t *array) {
+int ml_json_get_array_size(const ml_json_t *array) {
     ml_json_t *c; int i = 0;
     if (!array) return 0;
     c = array->child;
@@ -480,7 +480,7 @@ int ml_json_get_array_size(ml_json_t *array) {
     return i;
 }
 
-ml_json_t *ml_json_get_array_item(ml_json_t *array, int item) {
+ml_json_t *ml_json_get_array_item(const ml_json_t *array, int item) {
     ml_json_t *c;
     if (!array) return NULL;
     c = array->child;
@@ -488,7 +488,7 @@ ml_json_t *ml_json_get_array_item(ml_json_t *array, int item) {
     return c;
 }
 
-ml_json_t *ml_json_get_object_item(ml_json_t *object, const char *string) {
+ml_json_t *ml_json_get_object_item(const ml_json_t *object, const char *string) {
     ml_json_t *c;
     if (!object) return NULL;
     c = object->child;
@@ -497,7 +497,7 @@ ml_json_t *ml_json_get_object_item(ml_json_t *object, const char *string) {
 }
 
 /* ---- Typed convenience getters ---- */
-const char *ml_json_get_string(ml_json_t *obj, const char *key, const char *def)
+const char *ml_json_get_string(const ml_json_t *obj, const char *key, const char *def)
 {
     ml_json_t *item = ml_json_get_object_item(obj, key);
     if (item && item->type == ML_JSON_STRING && item->valuestring)
@@ -505,7 +505,7 @@ const char *ml_json_get_string(ml_json_t *obj, const char *key, const char *def)
     return def;
 }
 
-int ml_json_get_int(ml_json_t *obj, const char *key, int def)
+int ml_json_get_int(const ml_json_t *obj, const char *key, int def)
 {
     ml_json_t *item = ml_json_get_object_item(obj, key);
     if (item && item->type == ML_JSON_NUMBER)
@@ -513,7 +513,7 @@ int ml_json_get_int(ml_json_t *obj, const char *key, int def)
     return def;
 }
 
-double ml_json_get_double(ml_json_t *obj, const char *key, double def)
+double ml_json_get_double(const ml_json_t *obj, const char *key, double def)
 {
     ml_json_t *item = ml_json_get_object_item(obj, key);
     if (item && item->type == ML_JSON_NUMBER)
@@ -521,7 +521,7 @@ double ml_json_get_double(ml_json_t *obj, const char *key, double def)
     return def;
 }
 
-int ml_json_get_bool(ml_json_t *obj, const char *key, int def)
+int ml_json_get_bool(const ml_json_t *obj, const char *key, int def)
 {
     ml_json_t *item = ml_json_get_object_item(obj, key);
     if (item) {

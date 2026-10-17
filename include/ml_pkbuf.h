@@ -46,6 +46,8 @@ typedef struct ml_pkbuf_s {
     void  *            m_parm;
 
     void (*f_handler)(struct ml_pkbuf_s *);
+
+    ml_pool_t          *m_pool;
 } ml_pkbuf_t;
 
 /* pkbuf ring buffer — SPSC mode, len must be a power of 2 */
@@ -64,16 +66,19 @@ typedef struct ml_pring_s {
         (r)->m_ring = (b);                                      \
     } while(0)
 
-#define ml_pring_empty(r)                                      (((r)->m_in) == ((r)->m_out))
-#define ml_pring_input_final(r)                                (((r)->m_in)++)
-#define ml_pring_output_final(r)                               (((r)->m_out)++)
+#define ml_pring_empty(r)                                      (__atomic_load_n(&(r)->m_in, __ATOMIC_ACQUIRE) == __atomic_load_n(&(r)->m_out, __ATOMIC_ACQUIRE))
+#define ml_pring_input_final(r)                                __atomic_fetch_add(&(r)->m_in, 1, __ATOMIC_RELEASE)
+#define ml_pring_output_final(r)                               __atomic_fetch_add(&(r)->m_out, 1, __ATOMIC_RELEASE)
 #define ml_pring_input_get(r)                                  (r)->m_ring[((r)->m_in) & (((r)->m_len)-1)]
 #define ml_pring_output_get(r)                                 (r)->m_ring[((r)->m_out) & (((r)->m_len)-1)]
 #define ml_pring_output_set(r, b)                              ((r)->m_ring[((r)->m_out) & (((r)->m_len)-1)] = (b))
 #define ml_pring_input_set(r, b)                               ((r)->m_ring[((r)->m_in) & (((r)->m_len)-1)] = (b))
 
-/* Allocate a packet buffer with capacity for 'size' bytes of payload. */
-ml_pkbuf_t * ml_pkbuf_alloc(ml_int_t size);
-#define ml_pkbuf_free(a)        ml_free(a)
+/* Allocate a packet buffer with capacity for 'size' bytes of payload.
+ * pool: optional memory pool (NULL → malloc/free). */
+ml_pkbuf_t * ml_pkbuf_alloc(ml_int_t size, ml_pool_t *pool);
+
+/* Free a packet buffer allocated with ml_pkbuf_alloc. */
+void ml_pkbuf_free(ml_pkbuf_t *pkb);
 
 #endif

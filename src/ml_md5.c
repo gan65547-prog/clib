@@ -193,8 +193,7 @@ void ml_hash_md5_finish(ml_hash_md5_t *ctx, void *output, size_t size)
     uint64_t bits;
     int      i;
 
-    (void)size;
-    assert(size >= ML_HASH_MD5_DIGEST_SIZE);
+    if (size < ML_HASH_MD5_DIGEST_SIZE) return;
 
     /* Padding: append bit '1' (0x80 byte) then zeros. */
     memset(pad, 0, sizeof(pad));

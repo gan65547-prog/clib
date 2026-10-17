@@ -21,9 +21,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <unistd.h>
-
-/* error codes */
-#define ML_EAGAIN  (-2)   /* try again later */
+#include "ml_code.h"
 
 /* ── forward declarations ─────────────────────────────────────────────── */
 

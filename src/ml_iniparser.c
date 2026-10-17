@@ -272,23 +272,23 @@ static line_status_t ini_parse_line(const char *input_line, char *section, char 
     } else if (line[0] == '#' || line[0] == ';') {
         sta = LINE_COMMENT;
     } else if (line[0] == '[' && line[len - 1] == ']') {
-        sscanf(line, "[%[^]]", section);
+        sscanf(line, "[%1024[^]]", section);
         strstrip(section);
         strlwc(section, section, (unsigned)len);
         sta = LINE_SECTION;
-    } else if (sscanf(line, "%[^=] = \"%[^\"]\"", key, value) == 2 ||
-               sscanf(line, "%[^=] = '%[^\']'",   key, value) == 2) {
+    } else if (sscanf(line, "%1024[^=] = \"%1024[^\"]\"", key, value) == 2 ||
+               sscanf(line, "%1024[^=] = '%1024[^\']'",   key, value) == 2) {
         strstrip(key);
         strlwc(key, key, (unsigned)len);
         sta = LINE_VALUE;
-    } else if (sscanf(line, "%[^=] = %[^;#]", key, value) == 2) {
+    } else if (sscanf(line, "%1024[^=] = %1024[^;#]", key, value) == 2) {
         strstrip(key);
         strlwc(key, key, (unsigned)len);
         strstrip(value);
         if (!strcmp(value, "\"\"") || !strcmp(value, "''")) value[0] = 0;
         sta = LINE_VALUE;
-    } else if (sscanf(line, "%[^=] = %[;#]", key, value) == 2 ||
-               sscanf(line, "%[^=] %[=]", key, value) == 2) {
+    } else if (sscanf(line, "%1024[^=] = %1024[^;#]", key, value) == 2 ||
+               sscanf(line, "%1024[^=] %1024[=]", key, value) == 2) {
         strstrip(key);
         strlwc(key, key, (unsigned)len);
         value[0] = 0;
@@ -318,7 +318,7 @@ ml_dictionary_t *ml_ini_load(const char *ininame)
         ini_error("ml_ini: cannot open %s\n", ininame);
         return NULL;
     }
-    dict = ml_dictionary_new(0);
+    dict = ml_dictionary_new(0, NULL);
     if (!dict) { fclose(in); return NULL; }
 
     memset(line, 0, sizeof(line));

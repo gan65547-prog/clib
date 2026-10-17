@@ -12,9 +12,11 @@
 #ifndef __ML_MUX_H__
 #define __ML_MUX_H__
 
+#include <stddef.h>
 #include <stdint.h>
 
-typedef struct ml_mux_s ml_mux_t;
+typedef struct ml_mux_s  ml_mux_t;
+typedef struct ml_pool_s ml_pool_t;
 
 /* ── enums ──────────────────────────────────────────────────────────── */
 
@@ -32,8 +34,10 @@ typedef enum {
 /* ── lifecycle ──────────────────────────────────────────────────────── */
 
 /* Create muxer writing to `filename` in the given container format.
+ * pool: optional memory pool (NULL → malloc/free).
  * Returns NULL on failure (bad path, unsupported format). */
-ml_mux_t *ml_mux_create(const char *filename, ml_mux_format_e format);
+ml_mux_t *ml_mux_create(const char *filename, ml_mux_format_e format,
+                         ml_pool_t *pool);
 
 /* Configure the video stream.  Must be called before ml_mux_write_header.
  *   codec:       H264 or H265
@@ -45,7 +49,7 @@ ml_mux_t *ml_mux_create(const char *filename, ml_mux_format_e format);
 int ml_mux_set_video(ml_mux_t *m, ml_mux_codec_e codec,
                      int width, int height,
                      int fps_num, int fps_den,
-                     const uint8_t *extradata, int extradata_len);
+                     const uint8_t *extradata, size_t extradata_len);
 
 /* Write container header.  Must be called after ml_mux_set_video.
  * Returns 0 on success, -1 on error. */
@@ -56,7 +60,7 @@ int ml_mux_write_header(ml_mux_t *m);
  *   pts_ms:     presentation timestamp in milliseconds
  *   keyframe:   1 if this is an IDR / keyframe, 0 otherwise
  * Returns 0 on success, -1 on error. */
-int ml_mux_write_frame(ml_mux_t *m, const uint8_t *data, int len,
+int ml_mux_write_frame(ml_mux_t *m, const uint8_t *data, size_t len,
                        int64_t pts_ms, int keyframe);
 
 /* Write trailer and close the output file.  Safe to call on NULL. */

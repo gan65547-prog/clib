@@ -5,6 +5,9 @@
  * Keys and values are copied internally; the caller retains ownership of
  * the passed strings.  The table automatically grows when full.
  *
+ * Thread safety: NOT thread-safe.  External synchronization is required
+ * if accessed from multiple threads.
+ *
  * Adapted from N. Devillard's dictionary implementation.
  */
 #ifndef __ML_DICTIONARY_H__
@@ -19,19 +22,23 @@
 extern "C" {
 #endif
 
+typedef struct ml_pool_s ml_pool_t;
+
 typedef struct ml_dictionary_s {
     int          n;
     ssize_t      size;
     char       **val;
     char       **key;
     unsigned    *hash;
+    ml_pool_t   *pool;
 } ml_dictionary_t;
 
 /* Hash function used internally. Exposed for pre-computation if needed. */
 unsigned         ml_dictionary_hash(const char *key);
 
-/* Create a new dictionary. Minimum size is 128 entries. */
-ml_dictionary_t *ml_dictionary_new(size_t size);
+/* Create a new dictionary. Minimum size is 128 entries.
+ * pool: optional memory pool (NULL → malloc/free). */
+ml_dictionary_t *ml_dictionary_new(size_t size, ml_pool_t *pool);
 
 /* Delete a dictionary, freeing all keys, values, and internal arrays. */
 void             ml_dictionary_delete(ml_dictionary_t *d);

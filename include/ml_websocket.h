@@ -12,6 +12,7 @@
 #ifndef __ML_WEBSOCKET_H__
 #define __ML_WEBSOCKET_H__
 
+#include <stddef.h>
 #include <stdint.h>
 
 /* ── opcodes (RFC 6455 §5.2) ────────────────────────────────────────── */
@@ -50,7 +51,7 @@ typedef struct {
     int      masked;        /* 1 = payload is masked (client→server) */
     uint8_t  mask[4];       /* masking key (valid only when masked=1) */
     char    *payload;       /* pointer into input buffer, NOT owned */
-    int      payload_len;   /* payload byte length */
+    uint64_t  payload_len;   /* payload byte length */
 } ml_ws_frame_t;
 
 /* ── handshake ──────────────────────────────────────────────────────── */
@@ -116,7 +117,7 @@ int ml_ws_encode_close(int status_code, const char *reason,
                        int masked, char *out, int out_len);
 
 /* Apply / remove XOR masking in-place. idempotent (masking twice = original). */
-void ml_ws_mask(char *data, int len, const uint8_t mask[4]);
+void ml_ws_mask(char *data, size_t len, const uint8_t mask[4]);
 
 /* Human-readable opcode name for debugging/logging. */
 const char *ml_ws_opcode_name(int opcode);

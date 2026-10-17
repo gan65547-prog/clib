@@ -12,16 +12,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <openssl/sha.h>
 #include <openssl/rand.h>
+#include <sys/random.h>
 
 /* ── frame parsing ──────────────────────────────────────────────────── */
 
 int
 ml_ws_parse_frame(const char *data, int len, ml_ws_frame_t *frame)
 {
-    int hdr_len, consumed;
+    int hdr_len;
+    int64_t consumed;
     uint64_t payload_len;
     const unsigned char *p;
     uint8_t b0, b1;
@@ -66,16 +69,16 @@ ml_ws_parse_frame(const char *data, int len, ml_ws_frame_t *frame)
     if (payload_len > ML_WS_MAX_FRAME_SIZE)
         return -1;
 
-    consumed = hdr_len + (int)payload_len;
+    consumed = hdr_len + (int64_t)payload_len;
     if (len < consumed) return 0;
 
     frame->payload     = (char *)data + hdr_len;
-    frame->payload_len = (int)payload_len;
+    frame->payload_len = payload_len;
 
     if (frame->masked)
         ml_ws_mask(frame->payload, payload_len, frame->mask);
 
-    return consumed;
+    return (int)consumed;
 }
 
 /* ── frame encoding ─────────────────────────────────────────────────── */
@@ -120,7 +123,8 @@ ml_ws_encode_frame(int opcode, const char *payload, int payload_len,
 
         if (out_len < hdr_pos + 4) return -1;
 
-        {
+        if (RAND_bytes(mask_key, sizeof(mask_key)) != 1) {
+            /* fallback: LCG seeded from clock */
             struct timespec ts;
             unsigned int seed;
             clock_gettime(CLOCK_REALTIME, &ts);
@@ -167,7 +171,8 @@ ml_ws_encode_close(int status_code, const char *reason,
 
     if (reason) {
         int rlen = (int)strlen(reason);
-        int max_reason = (int)(sizeof(payload) - plen);
+        int max_reason = 125 - plen;  /* RFC 6455: control frame payload ≤ 125 */
+        if (max_reason < 0) max_reason = 0;
         if (rlen > max_reason) rlen = max_reason;
         memcpy(payload + plen, reason, rlen);
         plen += rlen;
@@ -180,9 +185,9 @@ ml_ws_encode_close(int status_code, const char *reason,
 /* ── masking ────────────────────────────────────────────────────────── */
 
 void
-ml_ws_mask(char *data, int len, const uint8_t mask[4])
+ml_ws_mask(char *data, size_t len, const uint8_t mask[4])
 {
-    int i;
+    size_t i;
     for (i = 0; i < len; i++)
         data[i] ^= (char)mask[i % 4];
 }
@@ -194,12 +199,15 @@ ml_ws_generate_key(char *key_out)
 {
     unsigned char random_bytes[16];
 
-    if (RAND_bytes(random_bytes, sizeof(random_bytes)) != 1) {
-        /* fallback: LCG seeded from clock + stack */
+    if (RAND_bytes(random_bytes, sizeof(random_bytes)) != 1 &&
+        getentropy(random_bytes, sizeof(random_bytes)) != 0) {
+        /* last resort: LCG seeded from clock + stack + pid */
         int i;
         struct timespec ts;
+        unsigned int seed;
         clock_gettime(CLOCK_REALTIME, &ts);
-        unsigned int seed = (unsigned int)(ts.tv_nsec ^ ts.tv_sec ^ (uintptr_t)&key_out);
+        seed = (unsigned int)(ts.tv_nsec ^ ts.tv_sec ^ (uintptr_t)&key_out
+                              ^ (unsigned int)getpid());
         for (i = 0; i < 16; i++) {
             seed = seed * 1103515245u + 12345u;
             random_bytes[i] = (unsigned char)((seed >> 16) & 0xFF);
@@ -229,12 +237,26 @@ ml_ws_accept_key(const char *key, char *accept_out)
     return accept_out;
 }
 
+static int
+has_crlf(const char *s)
+{
+    if (!s) return 0;
+    for (; *s; s++) {
+        if (*s == '\r' || *s == '\n') return 1;
+    }
+    return 0;
+}
+
 int
 ml_ws_client_handshake(const char *host, const char *path,
                        const char *key, char *out, int out_len)
 {
     int n;
     if (!host || !path || !key || !out || out_len < 1)
+        return -1;
+
+    /* reject CRLF injection attempts */
+    if (has_crlf(host) || has_crlf(path) || has_crlf(key))
         return -1;
 
     n = snprintf(out, out_len,

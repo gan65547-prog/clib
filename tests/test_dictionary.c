@@ -6,20 +6,20 @@ void test_dictionary_suite(void)
     TEST_SUITE("Dictionary (Hash Table)");
 
     RUN_TEST("create and delete", {
-        ml_dictionary_t *d = ml_dictionary_new(0);
+        ml_dictionary_t *d = ml_dictionary_new(0, NULL);
         ASSERT_PTR_NOT_NULL(d, "create");
         ml_dictionary_delete(d);
     });
 
     RUN_TEST("set and get", {
-        ml_dictionary_t *d = ml_dictionary_new(0);
+        ml_dictionary_t *d = ml_dictionary_new(0, NULL);
         ASSERT_EQ(ml_dictionary_set(d, "key1", "val1"), 0, "set ok");
         ASSERT_STR_EQ(ml_dictionary_get(d, "key1", NULL), "val1", "get val1");
         ml_dictionary_delete(d);
     });
 
     RUN_TEST("overwrite existing key", {
-        ml_dictionary_t *d = ml_dictionary_new(0);
+        ml_dictionary_t *d = ml_dictionary_new(0, NULL);
         ml_dictionary_set(d, "k", "v1");
         ml_dictionary_set(d, "k", "v2");
         ASSERT_STR_EQ(ml_dictionary_get(d, "k", NULL), "v2", "overwritten");
@@ -27,13 +27,13 @@ void test_dictionary_suite(void)
     });
 
     RUN_TEST("default value for missing key", {
-        ml_dictionary_t *d = ml_dictionary_new(0);
+        ml_dictionary_t *d = ml_dictionary_new(0, NULL);
         ASSERT_STR_EQ(ml_dictionary_get(d, "nope", "fallback"), "fallback", "default");
         ml_dictionary_delete(d);
     });
 
     RUN_TEST("unset key", {
-        ml_dictionary_t *d = ml_dictionary_new(0);
+        ml_dictionary_t *d = ml_dictionary_new(0, NULL);
         ml_dictionary_set(d, "k", "v");
         ml_dictionary_unset(d, "k");
         ASSERT_STR_EQ(ml_dictionary_get(d, "k", "DEFAULT"), "DEFAULT", "gone");
@@ -41,7 +41,7 @@ void test_dictionary_suite(void)
     });
 
     RUN_TEST("multiple keys (10)", {
-        ml_dictionary_t *d = ml_dictionary_new(0);
+        ml_dictionary_t *d = ml_dictionary_new(0, NULL);
         char key[16];
         char val[16];
         int i;
@@ -59,7 +59,7 @@ void test_dictionary_suite(void)
     });
 
     RUN_TEST("grow beyond initial size", {
-        ml_dictionary_t *d = ml_dictionary_new(4);
+        ml_dictionary_t *d = ml_dictionary_new(4, NULL);
         char key[16];
         char val[16];
         int i;
@@ -81,7 +81,7 @@ void test_dictionary_suite(void)
     });
 
     RUN_TEST("dump output", {
-        ml_dictionary_t *d = ml_dictionary_new(0);
+        ml_dictionary_t *d = ml_dictionary_new(0, NULL);
         ml_dictionary_set(d, "a", "1");
         FILE *f = tmpfile();
         ASSERT_PTR_NOT_NULL(f, "tmpfile");

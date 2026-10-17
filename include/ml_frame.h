@@ -215,7 +215,7 @@ ml_frame_from_mem(ml_frame_t *f,
 static inline void
 ml_frame_ref(ml_frame_t *f)
 {
-    if (f) f->refcount++;
+    if (f) __atomic_add_fetch(&f->refcount, 1, __ATOMIC_RELAXED);
 }
 
 /* unref — on last reference, call release callback and close owned fds */
@@ -225,10 +225,11 @@ ml_frame_unref(ml_frame_t *f)
     int i;
 
     if (!f) return;
-    if (--f->refcount > 0) return;
+    if (__atomic_sub_fetch(&f->refcount, 1, __ATOMIC_RELAXED) > 0) return;
 
     if (f->release) {
         f->release(f->owner, f->fd[0]);
+        f->fd[0] = -1;  /* release handles fd lifecycle, prevent double-close */
     }
 
     if (f->flags & ML_FRAME_FLAG_OWN_FD) {

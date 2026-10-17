@@ -27,6 +27,8 @@
 #define ML_HTTP_MAX_HEADERS     4096
 #define ML_HTTP_MAX_BODY        65536
 
+#define ML_HTTP_BUF_SIZE       (ML_HTTP_MAX_HEADERS + ML_HTTP_MAX_BODY)
+
 #define ML_HTTP_PART_MAX        16
 #define ML_HTTP_PART_NAME       128
 #define ML_HTTP_PART_FILENAME   256
@@ -55,22 +57,26 @@ typedef struct {
     char              m_query[ML_HTTP_PATH_LEN];
     ml_http_header_t  m_headers[ML_HTTP_HEADER_MAX];
     int               m_header_count;
-    int               m_content_length;
+    size_t            m_content_length;
 
     char             *m_body;
-    int               m_body_len;
+    size_t            m_body_len;
 
     /* internal parser state */
     int               m_state;
-    int               m_offset;
-    char              m_buf[ML_HTTP_MAX_BODY];
+    size_t            m_offset;
+    size_t            m_body_start;
+    size_t            m_buf_size;
+    char             *m_buf;         /* heap-allocated parser buffer */
 } ml_http_request_t;
 
 typedef struct {
-    int    m_status;
-    char  *m_content_type;
-    char  *m_body;
-    int    m_body_len;
+    int         m_status;
+    char       *m_content_type;
+    const char *m_cors_origin;
+    const char *m_connection;
+    char       *m_body;
+    size_t      m_body_len;
 } ml_http_response_t;
 
 /* multipart form-data part descriptor */
@@ -78,13 +84,16 @@ typedef struct {
     char   m_name[ML_HTTP_PART_NAME];
     char   m_filename[ML_HTTP_PART_FILENAME];
     char   m_content_type[ML_HTTP_PART_CTYPE];
-    char  *m_data;           /* pointer into original buffer */
-    int    m_data_len;
+    char  *m_data;
+    size_t m_data_len;
 } ml_http_part_t;
 
 /* ── request parsing ────────────────────────────────────────────────── */
 
 void ml_http_request_init(ml_http_request_t *r);
+
+/* Free internal buffers. Must be called after ml_http_request_init. */
+void ml_http_request_free(ml_http_request_t *r);
 
 /*
  * Feed data into the parser. Returns:
@@ -92,7 +101,7 @@ void ml_http_request_init(ml_http_request_t *r);
  *   0    — need more data (incomplete)
  *   < 0  — parse error (malformed request)
  */
-int ml_http_parse(ml_http_request_t *r, const char *data, int len);
+int ml_http_parse(ml_http_request_t *r, const char *data, size_t len);
 
 /* case-insensitive header lookup, returns NULL if not found */
 const char *ml_http_header_get(const ml_http_request_t *r, const char *name);
@@ -107,13 +116,13 @@ const char *ml_http_method_str(ml_http_method_e method);
 
 /* serialise response into buf, returns bytes written */
 int ml_http_response_write(const ml_http_response_t *resp,
-                           char *buf, int buf_len);
+                           char *buf, size_t buf_len);
 
 int ml_http_json_response(int status, const char *json,
-                          char *buf, int buf_len);
+                          char *buf, size_t buf_len);
 
 int ml_http_error_response(int status, const char *msg,
-                           char *buf, int buf_len);
+                           char *buf, size_t buf_len);
 
 /* ── multipart form-data ────────────────────────────────────────────── */
 

@@ -74,7 +74,7 @@ ml_int64_t ml_splice(ml_int_t in_fd, ml_int64_t *in_off,
             chunk = ML_ZERO_COPY_CHUNK;
 
         n = splice(in_fd, iptr, out_fd, optr, chunk,
-                   (unsigned int)(flags | SPLICE_F_MOVE | SPLICE_F_NONBLOCK));
+                   (unsigned int)(flags | SPLICE_F_MOVE));
         if (n < 0) {
             if (errno == EAGAIN || errno == EINTR)
                 continue;
@@ -148,13 +148,13 @@ ml_int64_t ml_pipe_relay(ml_int_t in_fd, ml_int_t out_fd, ml_int64_t count)
 
         /* in_fd → pipe */
         n = splice(in_fd, NULL, pipefd[1], NULL, (size_t)chunk,
-                   SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
+                   SPLICE_F_MOVE);
         if (n <= 0)
             break;
 
         /* pipe → out_fd */
         n = splice(pipefd[0], NULL, out_fd, NULL, (size_t)n,
-                   SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
+                   SPLICE_F_MOVE);
         if (n <= 0)
             break;
 

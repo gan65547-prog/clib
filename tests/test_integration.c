@@ -206,11 +206,11 @@ static void test_message_header_ops(void) {
 /* ===== Test: Error code consistency ===== */
 static void test_error_codes(void) {
     ASSERT_EQ(ML_OK, 0, "ML_OK = 0");
-    ASSERT(ML_ERROR == 1000, "ML_ERROR = 1000");
-    ASSERT(ML_ENOMEM > ML_ERROR, "ENOMEM after ERROR");
-    ASSERT(ML_EPARAM > ML_ERROR, "EPARAM after ERROR");
-    ASSERT(ML_ENOREG > ML_ERROR, "ENOREG after ERROR");
-    ASSERT(ML_ESOCKT > ML_ERROR, "ESOCKT after ERROR");
+    ASSERT(ML_ERROR == -1, "ML_ERROR = -1");
+    ASSERT(ML_ENOMEM < ML_ERROR, "ENOMEM after ERROR");
+    ASSERT(ML_EPARAM < ML_ERROR, "EPARAM after ERROR");
+    ASSERT(ML_ENOREG < ML_ERROR, "ENOREG after ERROR");
+    ASSERT(ML_ESOCKT < ML_ERROR, "ESOCKT after ERROR");
 }
 
 /* ===== Test: Module client registration pattern (from sws_module_message.c) ===== */

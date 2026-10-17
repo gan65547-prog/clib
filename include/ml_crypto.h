@@ -22,6 +22,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "ml_code.h"
 
 /* ── constants ────────────────────────────────────────────────────── */
 
@@ -41,14 +42,6 @@ typedef enum {
 
 typedef struct ml_crypto_s ml_crypto_t;
 typedef struct ml_pool_s   ml_pool_t;
-
-/* ── return codes ─────────────────────────────────────────────────── */
-
-#define ML_OK       0
-#define ML_ERROR   -1
-#define ML_ECRYPTO -2   /* auth-tag mismatch — ciphertext tampered */
-#define ML_EINVAL  -3   /* invalid argument or bad file header     */
-#define ML_ENOMEM  -4   /* allocation failed                       */
 
 /* ── API ──────────────────────────────────────────────────────────── */
 

@@ -36,12 +36,24 @@ void
 ml_http_request_init(ml_http_request_t *r)
 {
     ml_memzero(r, sizeof(*r));
+    r->m_buf = (char *)malloc(ML_HTTP_BUF_SIZE);
+    if (r->m_buf)
+        r->m_buf_size = ML_HTTP_BUF_SIZE;
+}
+
+void
+ml_http_request_free(ml_http_request_t *r)
+{
+    if (!r) return;
+    free(r->m_buf);
+    r->m_buf      = NULL;
+    r->m_buf_size = 0;
 }
 
 /* ── helpers ────────────────────────────────────────────────────────── */
 
 static ml_http_method_e
-parse_method(const char *s, int len)
+parse_method(const char *s, size_t len)
 {
     if (len == 3 && !ml_strncmp(s, "GET", 3))     return ML_HTTP_GET;
     if (len == 4 && !ml_strncmp(s, "POST", 4))    return ML_HTTP_POST;
@@ -54,8 +66,22 @@ static int
 parse_content_length(ml_http_request_t *r)
 {
     const char *v = ml_http_header_get(r, "Content-Length");
+    long val;
+    char *end;
+
     if (!v) return -1;
-    return (int)atoi(v);
+
+    /* skip whitespace */
+    while (*v == ' ' || *v == '\t') v++;
+    if (*v < '0' || *v > '9') return -1;
+
+    val = strtol(v, &end, 10);
+    /* reject trailing non-whitespace garbage or overflow */
+    while (*end == ' ' || *end == '\t') end++;
+    if (*end != '\0') return -1;
+    if (val < 0 || val > ML_HTTP_MAX_BODY) return -1;
+
+    return (int)val;
 }
 
 /* ── public query API ───────────────────────────────────────────────── */
@@ -118,12 +144,12 @@ ml_http_query_get(const ml_http_request_t *r, const char *key)
 /* ── request parser ─────────────────────────────────────────────────── */
 
 int
-ml_http_parse(ml_http_request_t *r, const char *data, int len)
+ml_http_parse(ml_http_request_t *r, const char *data, size_t len)
 {
-    int i;
+    size_t i;
     char c;
 
-    if (!r || !data || len <= 0)
+    if (!r || !data || len == 0)
         return -1;
 
     for (i = 0; i < len; i++) {
@@ -196,7 +222,7 @@ ml_http_parse(ml_http_request_t *r, const char *data, int len)
             break;
 
         case HTTP_STATE_HEADER_VALUE:
-            if (c == '\r') {
+            if (c == '\r' || c == '\n') {
                 r->m_buf[r->m_offset - 1] = '\0';
                 if (r->m_header_count < ML_HTTP_HEADER_MAX) {
                     char *v = r->m_buf;
@@ -206,34 +232,34 @@ ml_http_parse(ml_http_request_t *r, const char *data, int len)
                     r->m_header_count++;
                 }
                 r->m_offset = 0;
-                r->m_state  = HTTP_STATE_HEADER_NAME;
+                r->m_state  = (c == '\n') ? HTTP_STATE_HEADER_DONE
+                                          : HTTP_STATE_HEADER_NAME;
             }
             break;
 
         case HTTP_STATE_HEADER_DONE:
             if (c == '\n') {
-                r->m_content_length = parse_content_length(r);
+                { int cl = parse_content_length(r); r->m_content_length = cl > 0 ? (size_t)cl : 0; }
                 if (r->m_content_length > 0) {
-                    r->m_offset = 0;
-                    r->m_state  = HTTP_STATE_BODY;
+                    r->m_body_start = r->m_offset;
+                    r->m_state      = HTTP_STATE_BODY;
                 } else {
-                    r->m_offset = 0;
-                    r->m_state  = HTTP_STATE_DONE;
-                    return i + 1;
+                    r->m_state = HTTP_STATE_DONE;
+                    return (int)(i + 1);
                 }
             }
             break;
 
         case HTTP_STATE_BODY:
-            if (r->m_offset >= (int)sizeof(r->m_buf) - 1)
+            if (!r->m_buf || r->m_offset >= r->m_buf_size - 1)
                 return -1;
 
-            if (r->m_offset >= r->m_content_length) {
+            if ((r->m_offset - r->m_body_start) >= r->m_content_length) {
                 r->m_buf[r->m_offset] = '\0';
-                r->m_body     = r->m_buf;
-                r->m_body_len = r->m_offset;
+                r->m_body     = r->m_buf + r->m_body_start;
+                r->m_body_len = r->m_offset - r->m_body_start;
                 r->m_state    = HTTP_STATE_DONE;
-                return i + 1;
+                return (int)(i + 1);
             }
             break;
 
@@ -243,7 +269,7 @@ ml_http_parse(ml_http_request_t *r, const char *data, int len)
     }
 
     if (r->m_state == HTTP_STATE_DONE)
-        return i;
+        return (int)i;
 
     return 0;
 }
@@ -268,53 +294,68 @@ status_text(int status)
 
 int
 ml_http_response_write(const ml_http_response_t *resp,
-                       char *buf, int buf_len)
+                       char *buf, size_t buf_len)
 {
-    int n;
+    int n, off = 0;
+    const char *conn;
 
-    if (!resp || !buf || buf_len <= 0)
+    if (!resp || !buf || buf_len == 0)
         return 0;
 
-    n = ml_snprintf(buf, buf_len,
+    n = snprintf(buf + off, buf_len - off,
         "HTTP/1.1 %d %s\r\n"
         "Content-Type: %s\r\n"
-        "Content-Length: %d\r\n"
-        "Connection: close\r\n"
-        "Access-Control-Allow-Origin: *\r\n"
-        "\r\n",
+        "Content-Length: %zu\r\n",
         resp->m_status, status_text(resp->m_status),
         resp->m_content_type ? resp->m_content_type : "application/json",
         resp->m_body ? resp->m_body_len : 0);
+    if (n < 0 || (size_t)n >= buf_len - off) return -1;
+    off += n;
 
-    if (n < 0) n = 0;
-    if (n > buf_len) n = buf_len;
-
-    if (resp->m_body && resp->m_body_len > 0 && n < buf_len) {
-        int remain = buf_len - n;
-        int copy = (remain < resp->m_body_len) ? remain : resp->m_body_len;
-        ml_memcpy(buf + n, resp->m_body, copy);
-        n += copy;
+    if (resp->m_cors_origin) {
+        n = snprintf(buf + off, buf_len - off,
+                     "Access-Control-Allow-Origin: %s\r\n",
+                     resp->m_cors_origin);
+        if (n < 0 || (size_t)n >= buf_len - off) return -1;
+        off += n;
     }
 
-    return n;
+    conn = resp->m_connection ? resp->m_connection : "close";
+    n = snprintf(buf + off, buf_len - off,
+                 "Connection: %s\r\n", conn);
+    if (n < 0 || (size_t)n >= buf_len - off) return -1;
+    off += n;
+
+    n = snprintf(buf + off, buf_len - off, "\r\n");
+    if (n < 0 || (size_t)n >= buf_len - off) return -1;
+    off += n;
+
+    if (resp->m_body && resp->m_body_len > 0 && (size_t)off < buf_len) {
+        size_t remain = buf_len - (size_t)off;
+        size_t copy = (remain < resp->m_body_len) ? remain : resp->m_body_len;
+        memcpy(buf + off, resp->m_body, copy);
+        off += (int)copy;
+    }
+
+    return off;
 }
 
 int
 ml_http_json_response(int status, const char *json,
-                      char *buf, int buf_len)
+                      char *buf, size_t buf_len)
 {
     ml_http_response_t resp;
     ml_memzero(&resp, sizeof(resp));
     resp.m_status       = status;
     resp.m_content_type = "application/json";
     resp.m_body         = (char *)json;
-    resp.m_body_len     = (int)ml_strlen(json);
+    resp.m_body_len     = ml_strlen(json);
     return ml_http_response_write(&resp, buf, buf_len);
 }
 
 int
 ml_http_error_response(int status, const char *msg,
-                       char *buf, int buf_len)
+                       char *buf, size_t buf_len)
 {
     char json[256];
     char safe_msg[128];
@@ -398,12 +439,15 @@ ml_http_boundary_get(const char *content_type)
  * Boundary is preceded by \r\n (or start of body) and "--".
  */
 static const char *
-find_boundary(const char *data, int len, const char *boundary,
-              int blen, int *p_offset)
+find_boundary(const char *data, size_t len, const char *boundary,
+              int blen, size_t *p_offset)
 {
-    int i;
+    size_t i;
 
-    for (i = *p_offset; i < len - blen - 4; i++) {
+    if ((size_t)blen + 4 > len)
+        return NULL;
+
+    for (i = *p_offset; i + (size_t)blen + 4 <= len; i++) {
         /* must start with \r\n--boundary */
         if (data[i] == '\r' && data[i+1] == '\n' &&
             data[i+2] == '-' && data[i+3] == '-') {
@@ -422,8 +466,9 @@ ml_http_parse_multipart(ml_http_request_t *r, const char *boundary,
                         ml_http_part_t *parts, int max_parts)
 {
     const char *data, *hdr, *body_start;
-    int dlen, blen, count = 0;
-    int offset;
+    size_t dlen;
+    int blen, count = 0;
+    size_t offset;
 
     if (!r || !r->m_body || !boundary || !parts || max_parts < 1)
         return -1;
@@ -439,8 +484,8 @@ ml_http_parse_multipart(ml_http_request_t *r, const char *boundary,
     if (!hdr) return -1;
 
     /* advance past "\r\n--boundary" */
-    hdr += 4 + blen;  /* skip \r\n--boundary */
-    offset = (int)(hdr - data);
+    hdr += 4 + blen;
+    offset = (size_t)(hdr - data);
 
     while (count < max_parts) {
         /* hdr now points right after boundary. Could be \r\n (next part)
@@ -461,7 +506,7 @@ ml_http_parse_multipart(ml_http_request_t *r, const char *boundary,
 
         while (offset < dlen) {
             /* check for end of headers */
-            if (hdr[0] == '\r' && hdr[1] == '\n') {
+            if (offset + 1 < dlen && hdr[0] == '\r' && hdr[1] == '\n') {
                 /* empty line → body follows */
                 hdr += 2;
                 offset += 2;
@@ -531,20 +576,18 @@ ml_http_parse_multipart(ml_http_request_t *r, const char *boundary,
             }
 
             /* advance to next line */
-            hdr = line_end + 2;  /* skip \r\n */
-            offset = (int)(hdr - data);
+            hdr = line_end + 2;
+            offset = (size_t)(hdr - data);
         }
 
         /* hdr now points to body start. Find next boundary. */
         body_start = hdr;
         {
-            int search_off = offset;
+            size_t search_off = offset;
             const char *next = find_boundary(data, dlen, boundary, blen,
                                              &search_off);
             if (next) {
-                /* body is from body_start to just before \r\n--boundary */
-                /* strip trailing \r\n before boundary */
-                int body_end = search_off;
+                size_t body_end = search_off;
                 if (body_end > offset && data[body_end - 2] == '\r' &&
                     data[body_end - 1] == '\n')
                     body_end -= 2;

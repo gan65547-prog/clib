@@ -240,6 +240,128 @@ static void test_null_checks(void)
     ASSERT(!ml_queue_full(NULL), "full NULL q → false");
 }
 
+/* ── interrupt ────────────────────────────────────────────────────── */
+
+typedef struct {
+    ml_queue_t *q;
+    int         called;
+} int_ctx_t;
+
+static void *blocked_consumer(void *arg)
+{
+    int_ctx_t *ctx = (int_ctx_t *)arg;
+    void *item = NULL;
+    ctx->called = 1;
+    int ret = ml_queue_pop(ctx->q, &item, -1);
+    return (void *)(intptr_t)(ret == ML_ERROR ? 0 : 1);
+}
+
+static void *blocked_producer(void *arg)
+{
+    int_ctx_t *ctx = (int_ctx_t *)arg;
+    int val = 42;
+    ctx->called = 1;
+    int ret = ml_queue_push(ctx->q, &val, -1);
+    return (void *)(intptr_t)(ret == ML_ERROR ? 0 : 1);
+}
+
+static void *timed_consumer(void *arg)
+{
+    int_ctx_t *ctx = (int_ctx_t *)arg;
+    void *item = NULL;
+    ctx->called = 1;
+    int ret = ml_queue_pop(ctx->q, &item, 5000);
+    return (void *)(intptr_t)(ret == ML_ERROR ? 0 : 1);
+}
+
+static void test_interrupt_pop(void)
+{
+    ml_queue_t *q = ml_queue_create(4, &g_pool);
+    pthread_t   thr;
+    int_ctx_t   ctx;
+    void       *res = NULL;
+
+    ASSERT_PTR_NOT_NULL(q, "create");
+
+    ctx.q      = q;
+    ctx.called = 0;
+
+    pthread_create(&thr, NULL, blocked_consumer, &ctx);
+
+    /* wait for thread to enter pop */
+    while (!ctx.called) usleep(1000);
+
+    ml_queue_interrupt(q);
+
+    pthread_join(thr, &res);
+    ASSERT_PTR_NULL(res, "interrupt pop returned ML_ERROR");
+
+    /* push/pop should still work after interrupt (interrupted flag persists,
+     * so infinite-wait paths return ML_ERROR; use try variants) */
+    int val = 99;
+    ASSERT_EQ(ml_queue_try_push(q, &val), ML_OK, "try_push after interrupt");
+    ASSERT_EQ(ml_queue_try_pop(q, (void**)&res), ML_OK, "try_pop after interrupt");
+
+    ml_queue_destroy(q);
+}
+
+static void test_interrupt_push(void)
+{
+    ml_queue_t *q = ml_queue_create(1, &g_pool);
+    pthread_t   thr;
+    int_ctx_t   ctx;
+    int         val = 1;
+    void       *res = NULL;
+
+    ASSERT_PTR_NOT_NULL(q, "create cap=1");
+
+    /* fill the queue */
+    ASSERT_EQ(ml_queue_push(q, &val, -1), ML_OK, "fill queue");
+
+    ctx.q      = q;
+    ctx.called = 0;
+
+    pthread_create(&thr, NULL, blocked_producer, &ctx);
+
+    while (!ctx.called) usleep(1000);
+
+    ml_queue_interrupt(q);
+
+    pthread_join(thr, &res);
+    ASSERT_PTR_NULL(res, "interrupt push returned ML_ERROR");
+
+    ml_queue_destroy(q);
+}
+
+static void test_interrupt_timed_wait(void)
+{
+    ml_queue_t *q = ml_queue_create(4, &g_pool);
+    pthread_t   thr;
+    int_ctx_t   ctx;
+    void       *res = NULL;
+
+    ASSERT_PTR_NOT_NULL(q, "create");
+
+    ctx.q      = q;
+    ctx.called = 0;
+
+    pthread_create(&thr, NULL, timed_consumer, &ctx);
+
+    while (!ctx.called) usleep(1000);
+
+    ml_queue_interrupt(q);
+
+    pthread_join(thr, &res);
+    ASSERT_PTR_NULL(res, "interrupt timed pop returned ML_ERROR");
+
+    ml_queue_destroy(q);
+}
+
+static void test_interrupt_null(void)
+{
+    ml_queue_interrupt(NULL);  /* no-op, no crash */
+}
+
 /* ── suite entry ─────────────────────────────────────────────────── */
 
 void test_queue_suite(void)
@@ -255,6 +377,10 @@ void test_queue_suite(void)
     RUN_TEST("single prod/cons 100",  test_single_producer_consumer());
     RUN_TEST("multi prod/cons 50x4",  test_multi_producer_consumer());
     RUN_TEST("null checks",           test_null_checks());
+    RUN_TEST("interrupt pop",          test_interrupt_pop());
+    RUN_TEST("interrupt push",         test_interrupt_push());
+    RUN_TEST("interrupt timed wait",   test_interrupt_timed_wait());
+    RUN_TEST("interrupt null",         test_interrupt_null());
 
     ml_pool_destroy(&g_pool);
 }

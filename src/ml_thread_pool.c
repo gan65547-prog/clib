@@ -59,9 +59,9 @@ static void *ml_thread_pool_worker(void *arg)
         ml_thread_mutex_unlock(&tp->m_mutex);
 
         task->f_func(task->m_arg);
-        tp->m_pool->f_free(tp->m_pool, task);
 
         ml_thread_mutex_lock(&tp->m_mutex);
+        tp->m_pool->f_free(tp->m_pool, task);
         tp->m_active--;
 
         if (tp->m_queue_head == NULL && tp->m_active == 0) {
@@ -160,6 +160,9 @@ void ml_thread_pool_destroy(ml_thread_pool_t *tp)
     ml_thread_cond_destroy(&tp->m_idle_cond);
     ml_thread_cond_destroy(&tp->m_cond);
     ml_thread_mutex_destroy(&tp->m_mutex);
+
+    tp->m_pool->f_free(tp->m_pool, tp->m_threads);
+    tp->m_pool->f_free(tp->m_pool, tp);
 }
 
 ml_int_t ml_thread_pool_submit(ml_thread_pool_t *tp, void (*func)(void *), void *arg)

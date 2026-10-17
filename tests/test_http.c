@@ -20,12 +20,13 @@ static void test_parse_get_simple(void)
     ml_http_request_t req;
     ml_http_request_init(&req);
 
-    ml_int_t n = ml_http_parse(&req, raw, (ml_int_t)strlen(raw));
+    ml_int_t n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
     ASSERT(req.m_method == ML_HTTP_GET, "method should be GET");
     ASSERT_STR_EQ(req.m_path, "/api/v1/health", "path should match");
     ASSERT_EQ(req.m_header_count, 1, "should have 1 header");
-    ASSERT(req.m_content_length < 0, "no body expected");
+    ASSERT(req.m_content_length == 0, "no body expected");
+    ml_http_request_free(&req);
 }
 
 static void test_parse_post_with_body(void)
@@ -40,7 +41,7 @@ static void test_parse_post_with_body(void)
     ml_http_request_t req;
     ml_http_request_init(&req);
 
-    ml_int_t n = ml_http_parse(&req, raw, (ml_int_t)strlen(raw));
+    ml_int_t n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
     ASSERT(req.m_method == ML_HTTP_POST, "method should be POST");
     ASSERT_STR_EQ(req.m_path, "/api/v1/plugins/start", "path should match");
@@ -49,6 +50,7 @@ static void test_parse_post_with_body(void)
     ASSERT_EQ(req.m_body_len, 15, "body_len should be 15");
     ASSERT(0 == memcmp(req.m_body, "{\"name\":\"test\"}", 15),
            "body content should match");
+    ml_http_request_free(&req);
 }
 
 static void test_parse_all_methods(void)
@@ -67,9 +69,10 @@ static void test_parse_all_methods(void)
     for (i = 0; i < 4; i++) {
         ml_http_request_t req;
         ml_http_request_init(&req);
-        ml_int_t n = ml_http_parse(&req, tests[i], (ml_int_t)strlen(tests[i]));
+        ml_int_t n = ml_http_parse(&req, tests[i], strlen(tests[i]));
         ASSERT(n > 0, "parse should succeed");
         ASSERT(req.m_method == expected[i], "method should match");
+        ml_http_request_free(&req);
     }
 }
 
@@ -84,9 +87,10 @@ static void test_parse_multiple_headers(void)
 
     ml_http_request_t req;
     ml_http_request_init(&req);
-    ml_int_t n = ml_http_parse(&req, raw, (ml_int_t)strlen(raw));
+    ml_int_t n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
     ASSERT_EQ(req.m_header_count, 3, "should have 3 headers");
+    ml_http_request_free(&req);
 }
 
 static void test_parse_incomplete_request(void)
@@ -94,8 +98,9 @@ static void test_parse_incomplete_request(void)
     const char *raw = "GET /api";
     ml_http_request_t req;
     ml_http_request_init(&req);
-    ml_int_t n = ml_http_parse(&req, raw, (ml_int_t)strlen(raw));
+    ml_int_t n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT_EQ(n, 0, "incomplete should return 0 (need more data)");
+    ml_http_request_free(&req);
 }
 
 static void test_parse_null_rejects(void)
@@ -106,7 +111,7 @@ static void test_parse_null_rejects(void)
            "NULL request should fail");
     ASSERT(ml_http_parse(&req, NULL, 10) < 0, "NULL data should fail");
     ASSERT(ml_http_parse(&req, "GET", 0) < 0, "zero length should fail");
-    ASSERT(ml_http_parse(&req, "GET", -1) < 0, "negative length should fail");
+    ml_http_request_free(&req);
 }
 
 /* ---- Header lookup ---- */
@@ -121,7 +126,7 @@ static void test_header_get_exact(void)
 
     ml_http_request_t req;
     ml_http_request_init(&req);
-    ml_int_t n = ml_http_parse(&req, raw, (ml_int_t)strlen(raw));
+    ml_int_t n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
 
     const char *v = ml_http_header_get(&req, "Content-Type");
@@ -134,6 +139,7 @@ static void test_header_get_exact(void)
 
     v = ml_http_header_get(&req, "Not-Present");
     ASSERT_PTR_NULL(v, "missing header should return NULL");
+    ml_http_request_free(&req);
 }
 
 static void test_header_get_case_insensitive(void)
@@ -145,7 +151,7 @@ static void test_header_get_case_insensitive(void)
 
     ml_http_request_t req;
     ml_http_request_init(&req);
-    ml_int_t n = ml_http_parse(&req, raw, (ml_int_t)strlen(raw));
+    ml_int_t n = ml_http_parse(&req, raw, strlen(raw));
     ASSERT(n > 0, "parse should succeed");
 
     ASSERT_PTR_NOT_NULL(ml_http_header_get(&req, "x-test"),
@@ -154,6 +160,7 @@ static void test_header_get_case_insensitive(void)
                         "uppercase should match");
     ASSERT_PTR_NOT_NULL(ml_http_header_get(&req, "X-Test"),
                         "mixed case should match");
+    ml_http_request_free(&req);
 }
 
 static void test_header_get_null_checks(void)
@@ -163,6 +170,7 @@ static void test_header_get_null_checks(void)
         ml_http_request_t req;
         ml_http_request_init(&req);
         ASSERT_PTR_NULL(ml_http_header_get(&req, NULL), "NULL name → NULL");
+        ml_http_request_free(&req);
     }
 }
 
@@ -188,8 +196,9 @@ static void test_response_write_200(void)
     ml_memzero(&resp, sizeof(resp));
     resp.m_status       = 200;
     resp.m_content_type = "application/json";
+    resp.m_cors_origin  = "*";
     resp.m_body         = body;
-    resp.m_body_len     = (ml_int_t)strlen(body);
+    resp.m_body_len     = strlen(body);
 
     ml_int_t n = ml_http_response_write(&resp, buf, sizeof(buf));
     ASSERT(n > 0, "response should be written");
@@ -231,8 +240,6 @@ static void test_response_write_null_checks(void)
                   "NULL buf → 0");
         ASSERT_EQ(ml_http_response_write(&resp, buf, 0), 0,
                   "zero buf_len → 0");
-        ASSERT_EQ(ml_http_response_write(&resp, buf, -1), 0,
-                  "negative buf_len → 0");
     }
 }
 

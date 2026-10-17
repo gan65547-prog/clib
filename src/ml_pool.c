@@ -55,6 +55,7 @@ static ml_memory_t * ml_alloc_from_page(ml_page_head_t * pool, ml_uint64_t size)
     ml_page_t * cur;
     ml_memory_t * m;
 
+    if (size > (ml_uint64_t)-1 - sizeof(ml_memory_t)) return NULL;
     length = size + sizeof(ml_memory_t);
 
     /* 从页内存中查找空间 */
@@ -67,13 +68,14 @@ static ml_memory_t * ml_alloc_from_page(ml_page_head_t * pool, ml_uint64_t size)
 
             /* 更新页内存中的data指针 */
             cur->m_data += length;
+            pool->m_page_left -= length;
 
             m->m_size = length;
             return m;
         }
         cur = cur->m_next;
     }
-    
+
 
     /* 创建新页内存 */
     cur  = ml_pool_create_page(pool, pool->m_page_size);
@@ -84,6 +86,7 @@ static ml_memory_t * ml_alloc_from_page(ml_page_head_t * pool, ml_uint64_t size)
 
             /* 更新页内存中的data指针 */
             cur->m_data += length;
+            pool->m_page_left -= length;
 
             m->m_size = length;
             return m;

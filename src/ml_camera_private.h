@@ -38,9 +38,24 @@ typedef struct {
 } ml_camera_v4l2_buf_t;
 #endif
 
+typedef struct ml_camera_ops_s {
+    void         (*destroy)(ml_camera_t *cam);
+    int          (*start)(ml_camera_t *cam);
+    int          (*stop)(ml_camera_t *cam);
+    int          (*read)(ml_camera_t *cam, ml_frame_t *frame, int timeout_ms);
+    void         (*frame_release)(ml_camera_t *cam, ml_frame_t *frame);
+    int          (*set_callback)(ml_camera_t *cam, ml_camera_frame_cb cb, void *data);
+    int          (*get_width)(ml_camera_t *cam);
+    int          (*get_height)(ml_camera_t *cam);
+    int          (*get_fps)(ml_camera_t *cam);
+    int          (*get_state)(ml_camera_t *cam);
+    const char  *(*error)(ml_camera_t *cam);
+} ml_camera_ops_t;
+
 struct ml_camera_s {
-    int              backend;
-    ml_camera_cfg_t  cfg;
+    int                      backend;
+    const ml_camera_ops_t   *ops;
+    ml_camera_cfg_t          cfg;
     ml_pool_t       *pool;
     int              state;
 
@@ -136,6 +151,10 @@ int          ml_camera_rtsp_get_height(ml_camera_t *cam);
 int          ml_camera_rtsp_get_fps(ml_camera_t *cam);
 int          ml_camera_rtsp_get_state(ml_camera_t *cam);
 const char  *ml_camera_rtsp_error(ml_camera_t *cam);
+
+extern const ml_camera_ops_t ml_camera_stub_ops;
+extern const ml_camera_ops_t ml_camera_v4l2_ops;
+extern const ml_camera_ops_t ml_camera_rtsp_ops;
 
 #ifdef __cplusplus
 }

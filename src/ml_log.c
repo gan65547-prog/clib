@@ -46,7 +46,7 @@ void ml_log_write(ml_log_t * log, ml_uint_t size)
 {
     int ret = 0;
 
-    if (log->m_fd > 0) {
+    if (log->m_fd >= 0) {
         ml_thread_mutex_lock(&log->m_mutex);
 
         if ( log->m_store >= log->m_length ) {
@@ -64,7 +64,7 @@ void ml_log_write(ml_log_t * log, ml_uint_t size)
 
 
 
-char * ml_log_level(ml_int_t level)
+const char * ml_log_level(ml_int_t level)
 {
     switch ( level ) {
         case ML_LOG_DEBUG :  { return "DEBUG"; } break;
@@ -81,7 +81,7 @@ char * ml_log_level(ml_int_t level)
 
 
 
-char * ml_log_date(ml_log_t * log)
+const char * ml_log_date(ml_log_t * log)
 {
     time_t timep;
     struct tm tm_now, *now;
@@ -114,9 +114,9 @@ void ml_log_create(ml_log_t * log, const char * path, ml_uint_t deflv, ml_uint_t
     log->m_store   = ml_log_length(path);
     log->m_buff    = buf;
 
-    log->m_fd = ((fd = open(path, O_CREAT | O_RDWR , mode)) > 0 ) ? fd : 0;
+    log->m_fd = ((fd = open(path, O_CREAT | O_RDWR , mode)) >= 0 ) ? fd : -1;
 
-    if (fd > 0)
+    if (fd >= 0)
         lseek(fd, 0, SEEK_END);
 
     ml_thread_mutex_create(&log->m_mutex);
@@ -126,7 +126,7 @@ void ml_log_create(ml_log_t * log, const char * path, ml_uint_t deflv, ml_uint_t
 
 void ml_log_destroy(ml_log_t * log)
 {
-    if (log->m_fd)
+    if (log->m_fd >= 0)
         close(log->m_fd);
     ml_thread_mutex_destroy(&log->m_mutex);
 }

@@ -47,9 +47,8 @@ struct ml_pipeline_stage_s {
     int                    stop_sentinel;
 
     /* set by stop() to request thread exit; breaks output-push deadlock.
-     * Written once by stop(), read in worker loop — volatile is sufficient
-     * on all supported architectures (x86_64, aarch64) for a flag pattern. */
-    volatile int           shutdown;
+     * _Atomic guarantees visibility across threads per C11 memory model. */
+    _Atomic int            shutdown;
 };
 
 /* ── helpers ────────────────────────────────────────────────────────── */

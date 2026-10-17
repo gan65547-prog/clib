@@ -11,11 +11,11 @@
 
 
 
-char * ml_strchr(const char *s, int c)
+const char * ml_strchr(const char *s, int c)
 {
     for (; ; ++s) {
         if (*s == (char)c)
-            return (char *)s;
+            return s;
         if (*s == '\0')
             return NULL;
     }
@@ -50,32 +50,32 @@ int ml_strnlen(const char *p, int n)
 
 
 
-char * ml_strrchr(const char *s, int c)
+const char * ml_strrchr(const char *s, int c)
 {
     const char *last = NULL;
     do {
         if (*s == (char)c)
             last = s;
     } while (*s++);
-    return (char *)last;
+    return last;
 }
 
 
 
 
 
-char * ml_strnstr(const char *s1, const char *s2, int len)
+const char * ml_strnstr(const char *s1, const char *s2, int len)
 {
     int l2;
 
     l2 = strlen(s2);
     if (!l2)
-        return (char *)s1;
+        return s1;
 
     while (len >= l2 && *s1 != '\0') {
         len--;
         if (!memcmp(s1, s2, l2))
-            return (char *)s1;
+            return s1;
         s1++;
     }
     return NULL;
@@ -109,7 +109,7 @@ char * ml_cpystrn(char *dst, const char *src, int n)
 
 char * ml_cpystrrc(char *dst, const char *src, int dstlen, unsigned char c)
 {
-    char * p1;
+    const char * p1;
     int l, l1, l2;
 
     l1 = ml_strlen(src);
@@ -208,7 +208,7 @@ char * ml_cpystrc(char *dst, const char *src, int dstlen, int srclen, unsigned c
 
 char * ml_cpystrs(char * dst, const char * src, int dstlen, const char * ctx)
 {
-    char * p1;
+    const char * p1;
     int l1, l2, l;
 
     l1 = ml_strlen(src);
@@ -227,7 +227,8 @@ char * ml_cpystrs(char * dst, const char * src, int dstlen, const char * ctx)
 
 int ml_strresp(const char * input, const char * ctx, const char * rpl, char * output, int inlen, int outlen)
 {
-    char * p, *tmp, *dst;
+    const char * p, *tmp;
+    char *dst;
     int left = 0, len = 0;
     int lct, lrp, l1, l2;
     int size;
@@ -257,6 +258,7 @@ int ml_strresp(const char * input, const char * ctx, const char * rpl, char * ou
                     ml_strncpy(dst+len, rpl, lrp);
 
                     len += lrp;
+                    left -= lct;
                 }
                 else
                     break;

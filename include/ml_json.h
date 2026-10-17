@@ -5,7 +5,10 @@
  * programmatically and print them back to JSON text.  Supports objects,
  * arrays, strings, numbers, booleans, and null.
  *
- * Thread-safe as long as different trees are not shared across threads.
+ * Thread safety: NOT thread-safe for the same tree.  Different trees may be
+ * used concurrently in different threads.  Concurrent access to the same
+ * ml_json_t tree requires external synchronization.  The global allocation
+ * hooks (json_malloc/json_free) must be set before any concurrent use.
  */
 #ifndef __ML_JSON_H__
 #define __ML_JSON_H__
@@ -60,19 +63,19 @@ void        ml_json_delete(ml_json_t *c);
 /* ---- query ---- */
 
 /* Number of elements in a JSON array. */
-int         ml_json_get_array_size(ml_json_t *array);
+int         ml_json_get_array_size(const ml_json_t *array);
 
 /* Get the n-th element of a JSON array (0-based). Returns NULL if out of bounds. */
-ml_json_t  *ml_json_get_array_item(ml_json_t *array, int item);
+ml_json_t  *ml_json_get_array_item(const ml_json_t *array, int item);
 
 /* Get a child object by key. Returns NULL if not found. */
-ml_json_t  *ml_json_get_object_item(ml_json_t *object, const char *string);
+ml_json_t  *ml_json_get_object_item(const ml_json_t *object, const char *string);
 
 /* Convenience: get typed value from an object key, returning def if missing. */
-const char *ml_json_get_string(ml_json_t *obj, const char *key, const char *def);
-int         ml_json_get_int(ml_json_t *obj, const char *key, int def);
-double      ml_json_get_double(ml_json_t *obj, const char *key, double def);
-int         ml_json_get_bool(ml_json_t *obj, const char *key, int def);
+const char *ml_json_get_string(const ml_json_t *obj, const char *key, const char *def);
+int         ml_json_get_int(const ml_json_t *obj, const char *key, int def);
+double      ml_json_get_double(const ml_json_t *obj, const char *key, double def);
+int         ml_json_get_bool(const ml_json_t *obj, const char *key, int def);
 
 /* ---- create ---- */
 

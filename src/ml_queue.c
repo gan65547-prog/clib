@@ -13,6 +13,7 @@
 #include <time.h>
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 
 struct ml_queue_s {
     void          **ring;        /* circular buffer of void*     */
@@ -23,6 +24,7 @@ struct ml_queue_s {
     pthread_mutex_t mutex;
     pthread_cond_t  not_empty;   /* signaled on push             */
     pthread_cond_t  not_full;    /* signaled on pop              */
+    int             interrupted;
     ml_pool_t      *pool;
 };
 
@@ -45,24 +47,33 @@ ml_queue_t *
 ml_queue_create(int capacity, ml_pool_t *pool)
 {
     ml_queue_t *q;
+    size_t ring_bytes;
 
-    if (capacity < 1 || !pool) return NULL;
+    if (capacity < 1) return NULL;
 
-    q = pool->f_alloc(pool, sizeof(*q));
+    if (pool) {
+        q = pool->f_alloc(pool, sizeof(*q));
+    } else {
+        q = malloc(sizeof(*q));
+    }
     if (!q) return NULL;
     memset(q, 0, sizeof(*q));
 
-    q->ring = pool->f_alloc(pool, (size_t)capacity * sizeof(void *));
+    q->capacity = capacity;
+    q->pool     = pool;
+
+    ring_bytes = (size_t)capacity * sizeof(void *);
+    if (pool) {
+        q->ring = pool->f_alloc(pool, ring_bytes);
+    } else {
+        q->ring = malloc(ring_bytes);
+    }
     if (!q->ring) {
-        pool->f_free(pool, q);
+        if (pool) pool->f_free(pool, q);
+        else free(q);
         return NULL;
     }
-
-    q->capacity = capacity;
-    q->count    = 0;
-    q->head     = 0;
-    q->tail     = 0;
-    q->pool     = pool;
+    memset(q->ring, 0, ring_bytes);
 
     pthread_mutex_init(&q->mutex, NULL);
     pthread_cond_init(&q->not_empty, NULL);
@@ -80,8 +91,16 @@ ml_queue_destroy(ml_queue_t *q)
     pthread_cond_destroy(&q->not_empty);
     pthread_mutex_destroy(&q->mutex);
 
-    q->pool->f_free(q->pool, q->ring);
-    q->pool->f_free(q->pool, q);
+    if (q->ring) {
+        if (q->pool)
+            q->pool->f_free(q->pool, q->ring);
+        else
+            free(q->ring);
+    }
+    if (q->pool)
+        q->pool->f_free(q->pool, q);
+    else
+        free(q);
 }
 
 /* ── push ────────────────────────────────────────────────────────── */
@@ -96,9 +115,9 @@ ml_queue_push(ml_queue_t *q, void *item, int timeout_ms)
     pthread_mutex_lock(&q->mutex);
 
     if (timeout_ms < 0) {
-        /* infinite wait */
-        while (q->count == q->capacity)
+        while (q->count == q->capacity && !q->interrupted)
             pthread_cond_wait(&q->not_full, &q->mutex);
+        if (q->interrupted) { ret = ML_ERROR; goto done; }
     } else if (timeout_ms == 0) {
         /* try once */
         if (q->count == q->capacity) {
@@ -111,13 +130,14 @@ ml_queue_push(ml_queue_t *q, void *item, int timeout_ms)
         clock_gettime(CLOCK_REALTIME, &ts);
         timespec_add_ms(&ts, timeout_ms);
 
-        while (q->count == q->capacity) {
+        while (q->count == q->capacity && !q->interrupted) {
             int rc = pthread_cond_timedwait(&q->not_full, &q->mutex, &ts);
             if (rc == ETIMEDOUT) {
                 ret = ML_EAGAIN;
                 goto done;
             }
         }
+        if (q->interrupted) { ret = ML_ERROR; goto done; }
     }
 
     q->ring[q->tail] = item;
@@ -143,9 +163,9 @@ ml_queue_pop(ml_queue_t *q, void **item, int timeout_ms)
     pthread_mutex_lock(&q->mutex);
 
     if (timeout_ms < 0) {
-        /* infinite wait */
-        while (q->count == 0)
+        while (q->count == 0 && !q->interrupted)
             pthread_cond_wait(&q->not_empty, &q->mutex);
+        if (q->interrupted) { ret = ML_ERROR; goto done; }
     } else if (timeout_ms == 0) {
         /* try once */
         if (q->count == 0) {
@@ -158,13 +178,14 @@ ml_queue_pop(ml_queue_t *q, void **item, int timeout_ms)
         clock_gettime(CLOCK_REALTIME, &ts);
         timespec_add_ms(&ts, timeout_ms);
 
-        while (q->count == 0) {
+        while (q->count == 0 && !q->interrupted) {
             int rc = pthread_cond_timedwait(&q->not_empty, &q->mutex, &ts);
             if (rc == ETIMEDOUT) {
                 ret = ML_EAGAIN;
                 goto done;
             }
         }
+        if (q->interrupted) { ret = ML_ERROR; goto done; }
     }
 
     *item = q->ring[q->head];
@@ -209,4 +230,15 @@ ml_queue_full(const ml_queue_t *q)
 {
     if (!q) return false;
     return ml_queue_count(q) == q->capacity;
+}
+
+void
+ml_queue_interrupt(ml_queue_t *q)
+{
+    if (!q) return;
+    pthread_mutex_lock(&q->mutex);
+    q->interrupted = 1;
+    pthread_cond_broadcast(&q->not_empty);
+    pthread_cond_broadcast(&q->not_full);
+    pthread_mutex_unlock(&q->mutex);
 }

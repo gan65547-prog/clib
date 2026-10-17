@@ -15,7 +15,7 @@
 
 
 
-ml_int_t ml_kring_create(char * path, ml_uint_t length, ml_kring_t * kr)
+ml_int_t ml_kring_create(const char * path, ml_uint_t length, ml_kring_t * kr)
 {
     ml_int_t ret;
     ml_uint8_t * data;
@@ -34,11 +34,12 @@ ml_int_t ml_kring_create(char * path, ml_uint_t length, ml_kring_t * kr)
     kr->m_data  = data + sizeof(ml_kbuff_t);
 
     ret = pthread_mutexattr_init(&kr->m_kbuff->m_attr);
-    if (ret) return ML_ERROR;
+    if (ret) { ml_file_map_destroy(&kr->m_mmap); return ML_ERROR; }
     pthread_mutexattr_setpshared(&kr->m_kbuff->m_attr, PTHREAD_PROCESS_SHARED);
     ret = pthread_mutex_init(&kr->m_kbuff->m_mutex, &kr->m_kbuff->m_attr);
     if (ret) {
         pthread_mutexattr_destroy(&kr->m_kbuff->m_attr);
+        ml_file_map_destroy(&kr->m_mmap);
         return ML_ERROR;
     }
 
@@ -51,7 +52,7 @@ ml_int_t ml_kring_create(char * path, ml_uint_t length, ml_kring_t * kr)
 
 
 
-ml_int_t ml_kring_lookup(char * path,  ml_kring_t * kr)
+ml_int_t ml_kring_lookup(const char * path,  ml_kring_t * kr)
 {
     ml_int_t ret;
     ml_uint8_t * data;
@@ -170,8 +171,13 @@ ml_uint_t ml_kring_output(ml_kring_t * kr, void * buf, ml_uint_t len)
 ml_uint_t ml_kring_inall(ml_kring_t * kr, void * buf, ml_uint_t len)
 {
     ml_uint_t l, left;
-    ml_kbuff_t * fifo = kr->m_kbuff;
-    ml_uint8_t * data = kr->m_data;
+    ml_kbuff_t * fifo;
+    ml_uint8_t * data;
+
+    if (!kr || !kr->m_kbuff || !buf || len == 0) return 0;
+
+    fifo = kr->m_kbuff;
+    data = kr->m_data;
 
     pthread_mutex_lock(&kr->m_kbuff->m_mutex);
 
@@ -201,7 +207,11 @@ ml_uint_t ml_kring_inall(ml_kring_t * kr, void * buf, ml_uint_t len)
 ml_uint_t ml_kring_touse(ml_kring_t * kr)
 {
     ml_uint_t len;
-    ml_kbuff_t * fifo = kr->m_kbuff;
+    ml_kbuff_t * fifo;
+
+    if (!kr || !kr->m_kbuff) return 0;
+
+    fifo = kr->m_kbuff;
     
     pthread_mutex_lock(&kr->m_kbuff->m_mutex);
     /* 数据的长度 */
@@ -215,7 +225,11 @@ ml_uint_t ml_kring_touse(ml_kring_t * kr)
 ml_uint_t ml_kring_vacant(ml_kring_t * kr)
 {
     ml_uint_t len;
-    ml_kbuff_t * fifo = kr->m_kbuff;
+    ml_kbuff_t * fifo;
+
+    if (!kr || !kr->m_kbuff) return 0;
+
+    fifo = kr->m_kbuff;
     
     pthread_mutex_lock(&kr->m_kbuff->m_mutex);
     /* buffer中空余的长度 */

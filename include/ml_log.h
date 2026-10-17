@@ -42,10 +42,10 @@ void ml_log_create(ml_log_t * log, const char * path, ml_uint_t deflv,
 void ml_log_destroy(ml_log_t * log);
 
 /* Format the current date string. Returns pointer to log's internal buffer. */
-char * ml_log_date(ml_log_t * log);
+const char * ml_log_date(ml_log_t * log);
 
 /* Convert a log level integer to a human-readable string. */
-char * ml_log_level(ml_int_t level);
+const char * ml_log_level(ml_int_t level);
 
 /* Low-level: write a pre-formatted buffer to the log. */
 void ml_log_write(ml_log_t * log, ml_uint_t size);

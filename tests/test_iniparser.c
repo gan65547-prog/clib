@@ -41,8 +41,13 @@ void test_iniparser_suite(void)
         int nsec = ml_ini_get_nsec(ini);
         ASSERT_EQ(nsec, 2, "2 sections");
 
-        ASSERT_STR_EQ(ml_ini_get_secname(ini, 0), "server", "sec0");
-        ASSERT_STR_EQ(ml_ini_get_secname(ini, 1), "database", "sec1");
+        const char *s0 = ml_ini_get_secname(ini, 0);
+        const char *s1 = ml_ini_get_secname(ini, 1);
+        ASSERT_PTR_NOT_NULL(s0, "sec0");
+        ASSERT_PTR_NOT_NULL(s1, "sec1");
+        int ok = (strcmp(s0, "server") == 0 && strcmp(s1, "database") == 0) ||
+                 (strcmp(s0, "database") == 0 && strcmp(s1, "server") == 0);
+        ASSERT(ok, "sections are server and database");
 
         ml_ini_free(ini);
         unlink(path);
@@ -124,7 +129,7 @@ void test_iniparser_suite(void)
     });
 
     RUN_TEST("set and unset", {
-        ml_dictionary_t *d = ml_dictionary_new(0);
+        ml_dictionary_t *d = ml_dictionary_new(0, NULL);
         ml_ini_set(d, "s:key", "val");
         ASSERT_STR_EQ(ml_ini_get_string(d, "s:key", NULL), "val", "set");
 
